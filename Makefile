@@ -46,7 +46,7 @@ help:
 	@echo "  make ARCH=amd64 run   # Build and run AMD64"
 	@echo ""
 	@echo "Cross-compiler requirements:"
-	@echo "  RISC-V: riscv64-elf-gcc"
+	@echo "  RISC-V: riscv64-unknown-elf-gcc"
 	@echo "  ARM64:  aarch64-elf-gcc"
 	@echo "  AMD64:  x86_64-elf-gcc (or native gcc on x86_64)"
 
@@ -57,43 +57,33 @@ clean:
 	rm -rf build
 	@echo "$(GREEN)Clean complete$(NC)"
 
-# Check dependencies
+
+# Check dependencies - optimized version leveraging existing architecture detection
 .PHONY: check-deps
 check-deps:
-	@echo "$(BLUE)Checking build dependencies...$(NC)"
+ifeq ($(ARCH),)
+	@echo "$(BLUE)Checking build dependencies for all architectures...$(NC)"
 	@echo ""
-	@echo "Cross-compiler requirements:"
-	@echo "  RISC-V: riscv64-elf-gcc"
-	@echo "  ARM64:  aarch64-elf-gcc"
-	@echo "  AMD64:  x86_64-elf-gcc"
-	@echo ""
-	@echo -n "RISC-V: "
-	@if which riscv64-elf-gcc >/dev/null 2>&1; then \
-		echo "$(GREEN)riscv64-elf-gcc found$(NC)"; \
+	@$(MAKE) --no-print-directory ARCH=riscv check-deps
+	@$(MAKE) --no-print-directory ARCH=arm64 check-deps
+	@$(MAKE) --no-print-directory ARCH=amd64 check-deps
+else
+	@echo "$(BLUE)Checking $(ARCH) dependencies...$(NC)"
+	@echo "Architecture: $(ARCH_NAME)"
+	@echo -n "Compiler ($(CC)): "
+	@if which $(CC) >/dev/null 2>&1; then \
+		echo "$(GREEN)✓ found$(NC)"; \
 	else \
-		echo "$(RED)riscv64-elf-gcc not found$(NC)"; \
+		echo "$(RED)✗ not found$(NC)"; \
 	fi
-	@echo -n "ARM64:  "
-	@if which aarch64-elf-gcc >/dev/null 2>&1; then \
-		echo "$(GREEN)aarch64-elf-gcc found$(NC)"; \
+	@echo -n "QEMU ($(QEMU)): "
+	@if which $(QEMU) >/dev/null 2>&1; then \
+		echo "$(GREEN)✓ found$(NC)"; \
 	else \
-		echo "$(RED)aarch64-elf-gcc not found$(NC)"; \
-	fi
-	@echo -n "AMD64:  "
-	@if which x86_64-elf-gcc >/dev/null 2>&1; then \
-		echo "$(GREEN)x86_64-elf-gcc found$(NC)"; \
-	elif which gcc >/dev/null 2>&1 && [ "$$(uname -m)" = "x86_64" ]; then \
-		echo "$(GREEN)native gcc found (x86_64)$(NC)"; \
-	else \
-		echo "$(RED)x86_64-elf-gcc not found$(NC)"; \
+		echo "$(RED)✗ not found$(NC)"; \
 	fi
 	@echo ""
-	@echo -n "QEMU: "
-	@if which qemu-system-riscv64 >/dev/null 2>&1 && which qemu-system-aarch64 >/dev/null 2>&1 && which qemu-system-x86_64 >/dev/null 2>&1; then \
-		echo "$(GREEN)All QEMU systems found$(NC)"; \
-	else \
-		echo "$(YELLOW)Some QEMU systems missing$(NC)"; \
-	fi
+endif
 
 # Build target - builds all architectures or specified ARCH
 .PHONY: build
@@ -130,21 +120,47 @@ MAP := $(BUILD_DIR)/yasouos-$(ARCH).map
 
 # Compiler and QEMU configuration by architecture
 ifeq ($(ARCH),riscv)
-    CROSS_PREFIX := riscv64-elf-
-    ARCH_FLAGS := -march=rv64imac -mabi=lp64 -mcmodel=medany
+    # Detect available RISC-V compiler
+    ifneq ($(shell which riscv64-elf-gcc 2>/dev/null),)
+        CC := riscv64-elf-gcc
+    else ifneq ($(shell which riscv64-linux-gnu-gcc 2>/dev/null),)
+        CC := riscv64-linux-gnu-gcc
+    else ifneq ($(shell which riscv64-unknown-elf-gcc 2>/dev/null),)
+        CC := riscv64-unknown-elf-gcc
+    else
+        CC := riscv64-elf-gcc
+    endif
+    ARCH_FLAGS := -march=rv64ima -mabi=lp64 -mcmodel=medany -mno-relax
+    CFLAGS += -fno-strict-aliasing
     QEMU := qemu-system-riscv64
     QEMU_MACHINE := virt
     QEMU_FLAGS := -bios default
     ARCH_NAME := "RISC-V 64-bit"
 else ifeq ($(ARCH),arm64)
-    CROSS_PREFIX := aarch64-elf-
-    ARCH_FLAGS := -march=armv8-a
+    # Detect available ARM64 compiler
+    ifneq ($(shell which aarch64-elf-gcc 2>/dev/null),)
+        CC := aarch64-elf-gcc
+    else ifneq ($(shell which aarch64-linux-gnu-gcc 2>/dev/null),)
+        CC := aarch64-linux-gnu-gcc
+    else
+        CC := aarch64-elf-gcc
+    endif
+    ARCH_FLAGS := -march=armv8-a -mabi=lp64
     QEMU := qemu-system-aarch64
     QEMU_MACHINE := virt
     QEMU_FLAGS := -cpu cortex-a53 -semihosting-config enable=on,target=native
     ARCH_NAME := "ARM64/AArch64"
 else ifeq ($(ARCH),amd64)
-    CROSS_PREFIX := x86_64-elf-
+    # Detect available x86-64 compiler
+    ifneq ($(shell which x86_64-elf-gcc 2>/dev/null),)
+        CC := x86_64-elf-gcc
+    else ifneq ($(shell which x86_64-linux-gnu-gcc 2>/dev/null),)
+        CC := x86_64-linux-gnu-gcc
+    else ifneq ($(shell which gcc 2>/dev/null),)
+        CC := gcc
+    else
+        CC := x86_64-elf-gcc
+    endif
     ARCH_FLAGS := -m32
     QEMU := qemu-system-x86_64
     QEMU_MACHINE := q35
@@ -154,14 +170,23 @@ else
     $(error Unknown architecture: $(ARCH). Use ARCH=riscv, ARCH=arm64, or ARCH=amd64)
 endif
 
-# Compiler selection with fallback for AMD64
-CC := $(CROSS_PREFIX)gcc
-AS := $(CROSS_PREFIX)as
-LD := $(CROSS_PREFIX)ld
-OBJCOPY := $(CROSS_PREFIX)objcopy
-OBJDUMP := $(CROSS_PREFIX)objdump
+# Set other tools based on compiler
+COMPILER_PREFIX := $(subst gcc,,$(CC))
+ifeq ($(COMPILER_PREFIX),$(CC))
+    # Native compiler (gcc-14, etc)
+    AS := as
+    LD := ld
+    OBJCOPY := objcopy
+    OBJDUMP := objdump
+else
+    # Cross compiler
+    AS := $(COMPILER_PREFIX)as
+    LD := $(COMPILER_PREFIX)ld
+    OBJCOPY := $(COMPILER_PREFIX)objcopy
+    OBJDUMP := $(COMPILER_PREFIX)objdump
+endif
 
-# Check if cross compiler is available, fallback for AMD64 only
+# Check if compiler is available, fallback for AMD64 only
 ifeq ($(shell which $(CC) 2>/dev/null),)
     ifeq ($(ARCH),amd64)
         ifeq ($(shell uname -m),x86_64)
@@ -171,24 +196,25 @@ ifeq ($(shell which $(CC) 2>/dev/null),)
             OBJCOPY := objcopy
             OBJDUMP := objdump
         else
-            $(error AMD64 requires x86_64-elf-gcc or native x86_64 system)
+            $(error AMD64 requires cross compiler or native x86_64 system)
         endif
     else ifeq ($(ARCH),riscv)
-        $(error RISC-V requires riscv64-elf-gcc)
+        $(error RISC-V requires riscv64-elf-gcc, riscv64-linux-gnu-gcc, or riscv64-unknown-elf-gcc)
     else ifeq ($(ARCH),arm64)
-        $(error ARM64 requires aarch64-elf-gcc)
+        $(error ARM64 requires aarch64-elf-gcc or aarch64-linux-gnu-gcc)
     endif
 endif
 
-# Compiler flags
-CFLAGS := -std=c23 -O2 -g3 -Wall -Wextra
+# Compiler flags - using C23 standard
+CFLAGS := -std=c23 -O3 -g3 -Wall -Wextra
 CFLAGS += -ffreestanding -nostdlib -fno-builtin
+CFLAGS += -fno-stack-protector -fno-pic -fno-pie
 CFLAGS += -I$(INCLUDE_DIR)
 CFLAGS += $(ARCH_FLAGS)
 CFLAGS += -DARCH_NAME=\"$(ARCH_NAME)\"
 
 # Linker flags
-LDFLAGS := -nostdlib -static -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
+LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 
 # Source files
 C_SOURCES := $(LIB_DIR)/kernel.c $(LIB_DIR)/common.c $(ARCH_DIR)/platform.c
@@ -228,21 +254,27 @@ $(BUILD_DIR)/%.o: $(ARCH_DIR)/%.S
 .PHONY: _build_single
 _build_single: $(KERNEL)
 
+
 # Single architecture test (internal target)
 .PHONY: _test_single
 _test_single: $(KERNEL)
 	@echo "$(BLUE)Testing YasouOS ($(ARCH))...$(NC)"
+	@rm -f $(BUILD_DIR)/test-$(ARCH).log
 	@{ \
 		$(QEMU) -machine $(QEMU_MACHINE) $(QEMU_FLAGS) \
 		-kernel $(KERNEL) \
 		-nographic \
-			--no-reboot 2>&1 || true; \
+		--no-reboot 2>&1 || true; \
 	} | tee $(BUILD_DIR)/test-$(ARCH).log
-	@if grep -q "Hello World" $(BUILD_DIR)/test-$(ARCH).log; then \
+	@if [ ! -s $(BUILD_DIR)/test-$(ARCH).log ]; then \
+		echo "$(RED)✗ Test failed for $(ARCH) - no output generated$(NC)"; \
+		echo "$(YELLOW)QEMU may have failed to start or kernel failed to boot$(NC)"; \
+		exit 1; \
+	elif grep -q "Hello World" $(BUILD_DIR)/test-$(ARCH).log; then \
 		echo "$(GREEN)✓ Test passed for $(ARCH)$(NC)"; \
 	else \
 		echo "$(RED)✗ Test failed for $(ARCH)$(NC)"; \
-		echo "$(YELLOW)Expected 'Hello World' in output$(NC)"; \
+		echo "$(YELLOW)Expected 'Hello World' in output but found:$(NC)"; \
 		cat $(BUILD_DIR)/test-$(ARCH).log; \
 		exit 1; \
 	fi

@@ -1,0 +1,275 @@
+name: Test YasouOS
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  build-qemu:
+    name: Build QEMU 10
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Cache QEMU
+      uses: actions/cache@v4
+      id: cache-qemu
+      with:
+        path: /opt/qemu-10
+        key: ${{ runner.os }}-qemu10-v3
+        restore-keys: |
+          ${{ runner.os }}-qemu10-
+
+    - name: Install QEMU build dependencies
+      if: steps.cache-qemu.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq build-essential ninja-build pkg-config \
+          libglib2.0-dev libpixman-1-dev python3-venv python3-pip \
+          git wget curl meson
+
+    - name: Build and Install QEMU 10
+      if: steps.cache-qemu.outputs.cache-hit != 'true'
+      run: |
+        # Build QEMU 10.1.0 from source with all architectures
+        wget -q https://download.qemu.org/qemu-10.1.0.tar.xz
+        tar xf qemu-10.1.0.tar.xz
+        cd qemu-10.1.0
+
+        # Build for all target architectures we need
+        ./configure --prefix=/opt/qemu-10 \
+          --target-list=riscv64-softmmu,aarch64-softmmu,x86_64-softmmu \
+          --enable-virtfs \
+          --disable-docs \
+          --disable-gtk \
+          --disable-sdl \
+          --disable-vnc
+
+        make -j$(nproc)
+        sudo make install
+        cd ..
+        rm -rf qemu-10.1.0 qemu-10.1.0.tar.xz
+
+    - name: Create QEMU archive
+      if: steps.cache-qemu.outputs.cache-hit != 'true'
+      run: |
+        sudo tar czf /tmp/qemu.tar.gz -C / opt/qemu-10
+
+    - name: Upload QEMU artifact
+      if: steps.cache-qemu.outputs.cache-hit != 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: qemu-10
+        path: /tmp/qemu.tar.gz
+        retention-days: 1
+
+  build-gcc:
+    name: Build GCC 15
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Cache GCC
+      uses: actions/cache@v4
+      id: cache-gcc
+      with:
+        path: /opt/gcc-15
+        key: ${{ runner.os }}-gcc15.2-binutils2.45-v1
+        restore-keys: |
+          ${{ runner.os }}-gcc15.2-binutils2.45-
+
+    - name: Install GCC build dependencies
+      if: steps.cache-gcc.outputs.cache-hit != 'true'
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq build-essential \
+          flex bison libgmp-dev libmpfr-dev libmpc-dev texinfo \
+          git wget curl
+
+    - name: Build and Install GCC 15 Cross-Compilers
+      if: steps.cache-gcc.outputs.cache-hit != 'true'
+      run: |
+        # First build binutils for each target
+        wget -q https://ftp.lip6.fr/pub/gnu/binutils/binutils-2.45.tar.xz || \
+        wget -q https://ftp.gnu.org/gnu/binutils/binutils-2.45.tar.xz
+        tar xf binutils-2.45.tar.xz
+
+        for TARGET in riscv64-linux-gnu aarch64-linux-gnu x86_64-linux-gnu; do
+          echo "Building binutils for $TARGET"
+          mkdir -p build-binutils-$TARGET
+          cd build-binutils-$TARGET
+
+          ../binutils-2.45/configure --prefix=/opt/gcc-15 \
+            --target=$TARGET \
+            --disable-nls \
+            --disable-werror \
+            --with-sysroot
+
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf build-binutils-$TARGET
+        done
+
+        rm -rf binutils-2.45 binutils-2.45.tar.xz
+
+        # Build GCC 15.2 from stable release (using European mirror for faster downloads)
+        wget -q https://ftp.lip6.fr/pub/gcc/releases/gcc-15.2.0/gcc-15.2.0.tar.xz || \
+        wget -q https://ftp.gnu.org/gnu/gcc/gcc-15.2.0/gcc-15.2.0.tar.xz
+        tar xf gcc-15.2.0.tar.xz
+
+        # Build for each target architecture
+        for TARGET in riscv64-linux-gnu aarch64-linux-gnu x86_64-linux-gnu; do
+          echo "Building GCC 15.2 for $TARGET"
+          mkdir -p build-$TARGET
+          cd build-$TARGET
+
+          ../gcc-15.2.0/configure --prefix=/opt/gcc-15 \
+            --target=$TARGET \
+            --enable-languages=c \
+            --disable-multilib \
+            --disable-bootstrap \
+            --disable-threads \
+            --disable-libssp \
+            --disable-libquadmath \
+            --disable-libgomp \
+            --disable-libvtv \
+            --disable-libstdcxx \
+            --disable-nls \
+            --disable-shared \
+            --disable-libcc1 \
+            --disable-libatomic \
+            --disable-libsanitizer \
+            --disable-libquadmath-support \
+            --disable-gold \
+            --disable-lto \
+            --disable-plugin \
+            --with-system-zlib
+
+          make -j$(nproc) all-gcc
+          sudo make install-gcc
+          cd ..
+          rm -rf build-$TARGET
+        done
+
+        rm -rf gcc-15.2.0 gcc-15.2.0.tar.xz
+
+    - name: Create GCC archive
+      if: steps.cache-gcc.outputs.cache-hit != 'true'
+      run: |
+        sudo tar czf /tmp/gcc.tar.gz -C / opt/gcc-15
+
+    - name: Upload GCC artifact
+      if: steps.cache-gcc.outputs.cache-hit != 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: gcc-15
+        path: /tmp/gcc.tar.gz
+        retention-days: 1
+
+  test:
+    name: Test ${{ matrix.arch }}
+    runs-on: ubuntu-24.04
+    needs: [build-qemu, build-gcc]
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [riscv, arm64, amd64]
+        include:
+          - arch: riscv
+            qemu_arch: riscv64
+            qemu_binary: qemu-system-riscv64
+          - arch: arm64
+            qemu_arch: aarch64
+            qemu_binary: qemu-system-aarch64
+          - arch: amd64
+            qemu_arch: x86_64
+            qemu_binary: qemu-system-x86_64
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Restore QEMU from cache
+      uses: actions/cache@v4
+      with:
+        path: /opt/qemu-10
+        key: ${{ runner.os }}-qemu10-v3
+        restore-keys: |
+          ${{ runner.os }}-qemu10-
+
+    - name: Restore GCC from cache
+      uses: actions/cache@v4
+      with:
+        path: /opt/gcc-15
+        key: ${{ runner.os }}-gcc15.2-binutils2.45-v1
+        restore-keys: |
+          ${{ runner.os }}-gcc15.2-binutils2.45-
+
+    - name: Add tools to PATH
+      run: |
+        echo "/opt/qemu-10/bin" >> $GITHUB_PATH
+        echo "/opt/gcc-15/bin" >> $GITHUB_PATH
+
+
+    - name: Verify toolchain installation
+      run: |
+        echo "=== Verifying toolchain versions ==="
+        ${{ matrix.qemu_binary }} --version | head -1
+
+        # Set correct GCC binary based on architecture
+        case "${{ matrix.arch }}" in
+          riscv)
+            export CC=/opt/gcc-15/bin/riscv64-linux-gnu-gcc
+            ;;
+          arm64)
+            export CC=/opt/gcc-15/bin/aarch64-linux-gnu-gcc
+            ;;
+          amd64)
+            export CC=/opt/gcc-15/bin/x86_64-linux-gnu-gcc
+            ;;
+        esac
+
+        $CC --version | head -1
+
+        # Export for subsequent steps
+        echo "CC=$CC" >> $GITHUB_ENV
+        echo "QEMU_BINARY=${{ matrix.qemu_binary }}" >> $GITHUB_ENV
+
+    - name: Build YasouOS for ${{ matrix.arch }}
+      run: |
+        # Force bare-metal linking for Linux toolchain
+        if [ "${{ matrix.arch }}" = "riscv" ]; then
+          export CFLAGS_EXTRA="-fno-stack-protector -fno-pic -fno-pie -mno-relax"
+          export LDFLAGS_EXTRA="-no-pie -static"
+        fi
+        make ARCH=${{ matrix.arch }} CC=$CC build
+
+    - name: Test YasouOS on ${{ matrix.arch }}
+      run: |
+        echo "=== Testing ${{ matrix.arch }} with debug info ==="
+        echo "Using QEMU: $QEMU_BINARY"
+        echo "Using GCC: $CC"
+        $QEMU_BINARY --version | head -1
+        $CC --version | head -1
+        echo "=== Running test ==="
+        timeout 30s make ARCH=${{ matrix.arch }} CC=$CC QEMU=$QEMU_BINARY test
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: yasouos-${{ matrix.arch }}-build
+        path: |
+          build/${{ matrix.arch }}/
+        retention-days: 7
+
+    - name: Upload test logs
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: yasouos-${{ matrix.arch }}-test-logs
+        path: |
+          build/${{ matrix.arch }}/test-*.log
+        retention-days: 7

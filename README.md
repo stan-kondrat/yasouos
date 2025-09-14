@@ -17,13 +17,14 @@ Run on AWS EC2 and return "Hello World" on HTTP port
 
 ## Technical Stack
 - Language: C23
-- Cross-Compilation: GCC toolchains
+- Cross-Compilation: GCC 15 toolchains
 - Build System: Makefile with multi-architecture support
-- Testing Environment: QEMU
+- Testing Environment: QEMU 10
 
 ## Install Dependencies
 ```bash
 # MacOS
+brew install gcc@15
 brew install riscv64-elf-gcc        # RISC-V 64-bit
 brew install aarch64-elf-gcc        # ARM64
 brew install x86_64-elf-gcc         # AMD64

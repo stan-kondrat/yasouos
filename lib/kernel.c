@@ -1,6 +1,6 @@
 #include "common.h"
 
-void kernel_main(void) {
+[[noreturn]] void kernel_main(void) {
 
     // Initialize platform-specific hardware
     platform_init();
@@ -16,4 +16,9 @@ void kernel_main(void) {
 
     // Halt the system
     platform_halt();
+
+    // Ensure we never return (in case platform_halt fails)
+    for (;;) {
+        __asm__ __volatile__("nop");
+    }
 }
