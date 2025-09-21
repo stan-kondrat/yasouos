@@ -55,12 +55,17 @@ void platform_puts(const char *str)
 
 void platform_halt(void)
 {
-    // Use semihosting to exit QEMU cleanly
-    register long x0 __asm__("x0") = 0x18; // SYS_EXIT
-    register long x1 __asm__("x1") = 0;    // Exit code 0
-    __asm__ volatile("hlt #0xf000" : : "r"(x0), "r"(x1) : "memory");
+    // Try PSCI (Power State Coordination Interface) system shutdown first
+    register long x0 __asm__("x0") = 0x84000008; // PSCI_SYSTEM_OFF
+    __asm__ volatile("hvc #0" : : "r"(x0) : "memory");
 
-    // Fallback: infinite loop if semihosting doesn't work
+    // Fallback: Use semihosting to exit QEMU cleanly
+    long params[2] = {0x20026, 0}; // ADP_Stopped_ApplicationExit, exit code 0
+    register long x0_semi __asm__("x0") = 0x18; // SYS_EXIT
+    register long x1_semi __asm__("x1") = (long)params;
+    __asm__ volatile("hlt #0xf000" : : "r"(x0_semi), "r"(x1_semi) : "memory");
+
+    // Final fallback: infinite loop
     while (1)
     {
         __asm__ volatile("wfe");

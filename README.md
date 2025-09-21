@@ -38,34 +38,54 @@ brew install qemu                   # All architectures
 # apt install gcc-multilib  # for x86_64
 ```
 
-## Building
+## Build System
+
+The project uses a simplified Makefile that supports all three architectures with template-based target generation:
 
 ```bash
-# All architectures
-make                    # Check dependencies, build and test
-make build              # Build all architectures
+make                    # Build and test all architectures (default)
+
+# Build all architectures
+make build              # Builds kernels and disk images for all archs
+
+# Build specific architecture
+make ARCH=riscv build   # RISC-V only
+make ARCH=arm64 build   # ARM64 only
+make ARCH=amd64 build   # AMD64 only
+
+# Testing
 make test               # Test all architectures
-
-# Single Architecture
-make ARCH=riscv         # Build and test RISC-V only
-make ARCH=arm64 build   # Build ARM64 only
+make ARCH=riscv test    # Test RISC-V only
+make ARCH=arm64 test    # Test ARM64 only
 make ARCH=amd64 test    # Test AMD64 only
+make test-img           # Test disk images for all architectures
+make ARCH=amd64 test-img # Test AMD64 disk image only
 
-# Other Commands
-make check-deps         # Check build dependencies
-make clean              # Remove build files
+# Utility commands
+make check-deps         # Check dependencies for all architectures
+make clean              # Remove all build files
 make help               # Show all available targets
 ```
 
-## Running
+## Running in QEMU
 
 ```bash
-# Run specific architecture in QEMU (interactive)
-make run                # RISC-V default (Ctrl-A X to exit)
-make ARCH=riscv run     # RISC-V
+# Run kernel directly (requires ARCH specification)
+make ARCH=riscv run     # RISC-V (Ctrl-A X to exit)
 make ARCH=arm64 run     # ARM64
 make ARCH=amd64 run     # AMD64
+
+# Run from disk image (bootable)
+make ARCH=amd64 run-img # AMD64 disk image (with bootloader)
 ```
+
+## Architecture Support
+
+The build system automatically detects available cross-compilers:
+
+- **RISC-V**: `riscv64-elf-gcc`, `riscv64-linux-gnu-gcc`, or `riscv64-unknown-elf-gcc`
+- **ARM64**: `aarch64-elf-gcc` or `aarch64-linux-gnu-gcc`
+- **AMD64**: `x86_64-elf-gcc`, `x86_64-linux-gnu-gcc`, or native `gcc` (on x86_64)
 
 ## Thanks
 - Inspired by https://github.com/nuta/operating-system-in-1000-lines
@@ -73,3 +93,4 @@ make ARCH=amd64 run     # AMD64
 
 ## License
 This project is not licensed yet.
+

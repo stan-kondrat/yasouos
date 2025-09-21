@@ -44,8 +44,10 @@ void platform_puts(const char *str) {
 
 void platform_halt(void) {
     // Use QEMU ISA debug exit device (iobase=0xf4)
-    // Exit code 0 = success, any other value = ((code << 1) | 1)
-    outb(0xf4, 0x00);  // Exit with code 0
+    // QEMU returns ((exit_value << 1) | 1), so to get exit code 0:
+    // We need (x << 1) | 1 = 0, which is impossible
+    // So we use exit value 0x10 which gives us exit code 0x21 (33)
+    outb(0xf4, 0x10);  // Exit with code 33
 
     // If debug exit device not available, halt
     for (;;) {

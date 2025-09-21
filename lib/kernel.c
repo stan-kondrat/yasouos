@@ -12,7 +12,7 @@
     puts("==================================\n\n");
     puts("Hello World from YasouOS!\n");
     puts("Architecture: "ARCH_NAME"\n");
-    puts("\nSystem halte.\n");
+    puts("\nSystem halted.\n");
 
     // Halt the system
     platform_halt();

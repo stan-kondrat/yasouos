@@ -1,7 +1,7 @@
 OUTPUT_FORMAT("elf32-i386")
 OUTPUT_ARCH("i386")
 
-/* Support both multiboot (0x100000) and disk boot (0x8000) */
+/* Disk boot linker script - kernel loaded at 0x8000 */
 SECTIONS {
     /* Bootloader section for disk boot (0x7C00) */
     .bootloader 0x7C00 : {
@@ -13,8 +13,8 @@ SECTIONS {
         KEEP(*(.multiboot))
     }
 
-    /* Set base address based on boot method */
-    . = DEFINED(DISK_BOOT) ? 0x8000 : 0x100000;
+    /* Set base address for disk boot */
+    . = 0x8000;
     __kernel_start = .;
 
     .text : {
