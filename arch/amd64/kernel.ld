@@ -13,6 +13,11 @@ SECTIONS {
         KEEP(*(.multiboot))
     }
 
+    /* PVH ELF note for QEMU direct kernel loading */
+    .note.xen : {
+        KEEP(*(.note.xen))
+    }
+
     /* Set base address based on boot method */
     . = DEFINED(DISK_BOOT) ? 0x8000 : 0x100000;
     __kernel_start = .;

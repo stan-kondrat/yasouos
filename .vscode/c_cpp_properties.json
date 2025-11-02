@@ -1,0 +1,29 @@
+{
+    "configurations": [
+        {
+            "name": "YasouOS",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "${workspaceFolder}/arch/*/",
+                "${workspaceFolder}/drivers/**"
+            ],
+            "defines": [
+                "ARCH_NAME=\"AMD64/x86-64\""
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "c23",
+            "cppStandard": "c++23",
+            "intelliSenseMode": "gcc-x64",
+            "compilerArgs": [
+                "-ffreestanding",
+                "-nostdlib",
+                "-fno-builtin",
+                "-fno-stack-protector",
+                "-fno-pic",
+                "-fno-pie"
+            ],
+            "configurationProvider": "ms-vscode.makefile-tools"
+        }
+    ],
+    "version": 4
+}

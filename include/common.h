@@ -11,6 +11,8 @@ int strcmp(const char* s1, const char* s2);
 // I/O functions
 void putchar(char ch);
 void puts(const char* s);
+void put_hex16(uint16_t value);
+void put_hex32(uint32_t value);
 
 // Platform-specific functions (must be implemented per arch)
 void platform_init(void);

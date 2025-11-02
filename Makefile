@@ -196,7 +196,31 @@ CFLAGS += -DARCH_NAME=\"$(ARCH_NAME)\"
 LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 
 # Source files
+DRIVER_DIR := drivers
+
+# Search paths for source files
+vpath %.c $(LIB_DIR) $(ARCH_DIR) $(DRIVER_DIR) $(DRIVER_DIR)/devicetree \
+          $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng
+vpath %.S $(ARCH_DIR)
+
 C_SOURCES := $(LIB_DIR)/kernel.c $(LIB_DIR)/common.c $(ARCH_DIR)/platform.c
+C_SOURCES += $(DRIVER_DIR)/driver_registry.c
+C_SOURCES += $(DRIVER_DIR)/drivers.c
+C_SOURCES += $(DRIVER_DIR)/virtio_net/virtio_net.c
+C_SOURCES += $(DRIVER_DIR)/virtio_blk/virtio_blk.c
+C_SOURCES += $(DRIVER_DIR)/virtio_rng/virtio_rng.c
+
+# Device tree implementation (common + architecture-specific)
+C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree.c
+ifeq ($(ARCH),amd64)
+C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree_amd64.c
+else ifeq ($(ARCH),arm64)
+C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree_arm64.c
+C_SOURCES += $(DRIVER_DIR)/devicetree/virtio_mmio.c
+else ifeq ($(ARCH),riscv)
+C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree_riscv.c
+C_SOURCES += $(DRIVER_DIR)/devicetree/virtio_mmio.c
+endif
 ASM_SOURCES := $(ARCH_DIR)/boot_kernel.S
 ifeq ($(ARCH),amd64)
 ASM_DISK_SOURCES := $(ARCH_DIR)/boot_disk.S
@@ -221,19 +245,11 @@ ASM_DISK_OBJECTS := $(patsubst %.S,$(BUILD_DIR)/%_disk.o,$(notdir $(ASM_DISK_SOU
 C_DISK_OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%_disk.o,$(notdir $(C_SOURCES)))
 DISK_OBJECTS := $(ASM_DISK_OBJECTS) $(C_DISK_OBJECTS)
 
-$(BUILD_DIR)/%_disk.o: $(LIB_DIR)/%.c | $(BUILD_DIR)
+$(BUILD_DIR)/%_disk.o: %.c | $(BUILD_DIR)
 	@echo "$(BLUE)Compiling $< for disk boot...$(NC)"
 	$(CC) $(CFLAGS) -DDISK_BOOT -c $< -o $@
 
-$(BUILD_DIR)/%_disk.o: $(ARCH_DIR)/%.c | $(BUILD_DIR)
-	@echo "$(BLUE)Compiling $< for disk boot...$(NC)"
-	$(CC) $(CFLAGS) -DDISK_BOOT -c $< -o $@
-
-$(BUILD_DIR)/boot_kernel_disk.o: $(ARCH_DIR)/boot_kernel.S | $(BUILD_DIR)
-	@echo "$(BLUE)Assembling $< for disk boot...$(NC)"
-	$(CC) $(CFLAGS) -DDISK_BOOT -c $< -o $@
-
-$(BUILD_DIR)/boot_disk_disk.o: $(ARCH_DIR)/boot_disk.S | $(BUILD_DIR)
+$(BUILD_DIR)/%_disk.o: %.S | $(BUILD_DIR)
 	@echo "$(BLUE)Assembling $< for disk boot...$(NC)"
 	$(CC) $(CFLAGS) -DDISK_BOOT -c $< -o $@
 
@@ -248,16 +264,12 @@ $(KERNEL_DISK_BIN): $(KERNEL_DISK_ELF)
 	@echo "$(GREEN)Disk kernel binary: $@ ($$(du -h $@ | cut -f1))$(NC)"
 endif
 
-# Pattern rules for compilation
-$(BUILD_DIR)/%.o: $(LIB_DIR)/%.c | $(BUILD_DIR)
+# Pattern rules for compilation (vpath handles source lookup)
+$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	@echo "$(BLUE)Compiling $<...$(NC)"
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/%.o: $(ARCH_DIR)/%.c | $(BUILD_DIR)
-	@echo "$(BLUE)Compiling $<...$(NC)"
-	$(CC) $(CFLAGS) -c $< -o $@
-
-$(BUILD_DIR)/%.o: $(ARCH_DIR)/%.S | $(BUILD_DIR)
+$(BUILD_DIR)/%.o: %.S | $(BUILD_DIR)
 	@echo "$(BLUE)Assembling $<...$(NC)"
 	$(CC) $(CFLAGS) -c $< -o $@
 

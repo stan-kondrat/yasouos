@@ -10,10 +10,21 @@ Run on AWS EC2 and return "Hello World" on HTTP port
 
 ## Features
 - Multi-architecture support (ARM64, AMD64, RISC-V)
-- VirtIO drivers (virtio-net, virtio-fs)
+- VirtIO drivers
 - Non-POSIX design
 - Single core, single process
 - stdout only (no stdin)
+
+## Supported Drivers
+
+YasouOS includes support for the following PCI devices:
+
+| Driver | Vendor ID | Device ID | Name | Status |
+|--------|-----------|-----------|------|--------|
+| **virtio-net** | 0x1af4 | 0x1000 | VirtIO Network| ✅ Working |
+| **virtio-blk** | 0x1af4 | 0x1001 | VirtIO Block Device | 🚧 Stub |
+| **virtio-rng** | 0x1af4 | 0x1005 | VirtIO RNG (Entropy Source) | 🚧 Stub |
+
 
 ## Technical Stack
 - Language: C23

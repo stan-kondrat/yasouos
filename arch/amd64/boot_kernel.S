@@ -5,6 +5,17 @@
 .long 0x00000003    # flags
 .long -(0x1BADB002 + 0x00000003)  # checksum
 
+# PVH ELF note for modern QEMU direct kernel loading
+.section .note.xen, "a"
+.align 4
+.long 4              # namesz (length of "Xen")
+.long 12             # descsz (3 uint32_t values)
+.long 18             # type (XEN_ELFNOTE_PHYS32_ENTRY = 18)
+.ascii "Xen\0"       # name
+.long _start         # 32-bit entry point
+.long 0              # reserved
+.long 0              # reserved
+
 .section .text.boot
 .global _start
 .code32

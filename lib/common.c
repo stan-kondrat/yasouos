@@ -37,3 +37,23 @@ void putchar(char ch) {
 void puts(const char* s) {
     platform_puts(s);
 }
+
+static const char hex_chars[] = "0123456789abcdef";
+
+void put_hex16(uint16_t value) {
+    putchar(hex_chars[(value >> 12) & 0xF]);
+    putchar(hex_chars[(value >> 8) & 0xF]);
+    putchar(hex_chars[(value >> 4) & 0xF]);
+    putchar(hex_chars[value & 0xF]);
+}
+
+void put_hex32(uint32_t value) {
+    putchar(hex_chars[(value >> 28) & 0xF]);
+    putchar(hex_chars[(value >> 24) & 0xF]);
+    putchar(hex_chars[(value >> 20) & 0xF]);
+    putchar(hex_chars[(value >> 16) & 0xF]);
+    putchar(hex_chars[(value >> 12) & 0xF]);
+    putchar(hex_chars[(value >> 8) & 0xF]);
+    putchar(hex_chars[(value >> 4) & 0xF]);
+    putchar(hex_chars[value & 0xF]);
+}
