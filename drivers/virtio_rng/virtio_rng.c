@@ -18,7 +18,7 @@ static void virtio_rng_exit(void) {
 }
 
 // Driver operations
-static void virtio_rng_remove([[maybe_unused]] const dt_device_t *device) {
+static void virtio_rng_remove([[maybe_unused]] const device_t *device) {
     global_device.initialized = 0;
 }
 
@@ -43,12 +43,12 @@ driver_reg_result_t virtio_rng_register_driver(void) {
     return driver_register(&virtio_rng_driver);
 }
 
-int virtio_rng_probe(const dt_device_t *device) {
+int virtio_rng_probe(const device_t *device) {
     if (!device) {
         return -1;
     }
 
-    global_device.dt_dev = *device;
+    global_device.device = *device;
     global_device.io_base = device->reg_base;
     global_device.initialized = 1;
 

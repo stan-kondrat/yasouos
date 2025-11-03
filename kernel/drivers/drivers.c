@@ -1,6 +1,6 @@
-#include "driver_registry.h"
-#include "../include/common.h"
-#include "devicetree/devicetree.h"
+#include "drivers.h"
+#include "../../common/common.h"
+#include "../devices/devices.h"
 
 #define MAX_DRIVERS 16
 
@@ -39,7 +39,7 @@ driver_reg_result_t driver_register(const device_driver_t *driver) {
     return DRIVER_REG_SUCCESS;
 }
 
-static int device_matches_driver(const dt_device_t *device, const device_driver_t *driver) {
+static int device_matches_driver(const device_t *device, const device_driver_t *driver) {
     const device_id_t *id = driver->id_table;
 
     while (id && (id->compatible || id->vendor_id != 0)) {
@@ -62,7 +62,7 @@ static int device_matches_driver(const dt_device_t *device, const device_driver_
     return 0;
 }
 
-static void probe_device_callback(const dt_device_t *device, void *context) {
+static void probe_device_callback(const device_t *device, void *context) {
     int *probe_count = (int *)context;
 
     for (int i = 0; i < driver_count; i++) {
@@ -115,9 +115,9 @@ static void probe_device_callback(const dt_device_t *device, void *context) {
     }
 }
 
-int driver_probe_all(void) {
+int drivers_probe_all(void) {
     int probe_count = 0;
-    dt_enumerate_devices(probe_device_callback, &probe_count);
+    devices_enumerate(probe_device_callback, &probe_count);
     return probe_count;
 }
 
@@ -220,4 +220,15 @@ int driver_disable(const char *name, const char *version) {
     state->enabled = 0;
 
     return 0;
+}
+
+void drivers_init_devices(void) {
+    puts("Probing devices...\n");
+    int probed_count = drivers_probe_all();
+
+    if (probed_count > 0) {
+        puts("\nSuccessfully initialized ");
+        put_hex16(probed_count);
+        puts(" device(s)\n");
+    }
 }

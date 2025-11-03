@@ -4,9 +4,8 @@
 SUPPORTED_ARCHS := riscv arm64 amd64
 
 # Directories
-INCLUDE_DIR := include
-LIB_DIR := lib
-ARCH_DIR = arch/$(ARCH)
+COMMON_DIR := common
+ARCH_DIR = kernel/platform/$(ARCH)
 BUILD_DIR = build/$(ARCH)
 
 # Colors
@@ -189,7 +188,7 @@ DISK_MAP := $(BUILD_DIR)/ld_disk.map
 
 # Compiler flags
 CFLAGS := -std=c23 -O3 -g3 -Wall -Wextra -ffreestanding -nostdlib -fno-builtin
-CFLAGS += -fno-stack-protector -fno-pic -fno-pie -I$(INCLUDE_DIR) $(ARCH_FLAGS)
+CFLAGS += -fno-stack-protector -fno-pic -fno-pie -I$(COMMON_DIR) $(ARCH_FLAGS)
 CFLAGS += -DARCH_NAME=\"$(ARCH_NAME)\"
 
 # Linker flags
@@ -199,27 +198,26 @@ LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 DRIVER_DIR := drivers
 
 # Search paths for source files
-vpath %.c $(LIB_DIR) $(ARCH_DIR) $(DRIVER_DIR) $(DRIVER_DIR)/devicetree \
+vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/drivers $(DRIVER_DIR) \
           $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng
 vpath %.S $(ARCH_DIR)
 
-C_SOURCES := $(LIB_DIR)/kernel.c $(LIB_DIR)/common.c $(ARCH_DIR)/platform.c
-C_SOURCES += $(DRIVER_DIR)/driver_registry.c
-C_SOURCES += $(DRIVER_DIR)/drivers.c
+C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(ARCH_DIR)/platform.c
+C_SOURCES += kernel/drivers/drivers.c
 C_SOURCES += $(DRIVER_DIR)/virtio_net/virtio_net.c
 C_SOURCES += $(DRIVER_DIR)/virtio_blk/virtio_blk.c
 C_SOURCES += $(DRIVER_DIR)/virtio_rng/virtio_rng.c
 
 # Device tree implementation (common + architecture-specific)
-C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree.c
+C_SOURCES += kernel/devices/devices.c
 ifeq ($(ARCH),amd64)
-C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree_amd64.c
+C_SOURCES += kernel/devices/devices_amd64.c
 else ifeq ($(ARCH),arm64)
-C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree_arm64.c
-C_SOURCES += $(DRIVER_DIR)/devicetree/virtio_mmio.c
+C_SOURCES += kernel/devices/devices_arm64.c
+C_SOURCES += kernel/devices/virtio_mmio.c
 else ifeq ($(ARCH),riscv)
-C_SOURCES += $(DRIVER_DIR)/devicetree/devicetree_riscv.c
-C_SOURCES += $(DRIVER_DIR)/devicetree/virtio_mmio.c
+C_SOURCES += kernel/devices/devices_riscv.c
+C_SOURCES += kernel/devices/virtio_mmio.c
 endif
 ASM_SOURCES := $(ARCH_DIR)/boot_kernel.S
 ifeq ($(ARCH),amd64)

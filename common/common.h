@@ -13,9 +13,3 @@ void putchar(char ch);
 void puts(const char* s);
 void put_hex16(uint16_t value);
 void put_hex32(uint32_t value);
-
-// Platform-specific functions (must be implemented per arch)
-void platform_init(void);
-void platform_putchar(char ch);
-void platform_puts(const char* s);
-void platform_halt(void);

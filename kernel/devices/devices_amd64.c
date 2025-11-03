@@ -1,5 +1,5 @@
-#include "devicetree.h"
-#include "../../include/common.h"
+#include "devices.h"
+#include "../../common/common.h"
 
 // AMD64 uses legacy PCI I/O ports as "device tree"
 #define PCI_CONFIG_ADDRESS_PORT 0xCF8
@@ -43,11 +43,7 @@ static uint32_t pci_config_read32(uint8_t bus, uint8_t device, uint8_t function,
     return io_inl(PCI_CONFIG_DATA_PORT);
 }
 
-int dt_init(void) {
-    return 0;
-}
-
-int dt_enumerate_devices(dt_device_callback_t callback, void *context) {
+int devices_enumerate(device_callback_t callback, void *context) {
     int device_count = 0;
 
     // Scan first 2 PCI buses for virtual machine environments
@@ -63,7 +59,7 @@ int dt_enumerate_devices(dt_device_callback_t callback, void *context) {
             uint32_t bar0 = pci_config_read32(bus, device, 0, PCI_BAR0_OFFSET);
 
             // AMD64/PCI doesn't use compatible strings - just vendor/device IDs
-            dt_device_t dev_info = {
+            device_t dev_info = {
                 .compatible = NULL,        // No compatible string for PCI
                 .reg_base = bar0 & 0xFFFC, // I/O port base
                 .reg_size = 0,             // Unknown for PCI
@@ -85,14 +81,14 @@ int dt_enumerate_devices(dt_device_callback_t callback, void *context) {
     return device_count;
 }
 
-int dt_find_device([[maybe_unused]] const char *compatible,
-                   [[maybe_unused]] dt_device_t *device) {
+int devices_find([[maybe_unused]] const char *compatible,
+                   [[maybe_unused]] device_t *device) {
     // AMD64 doesn't support compatible string lookup
     // Drivers should match by vendor/device ID
     return 0;
 }
 
-const char *dt_get_device_name([[maybe_unused]] uint16_t vendor_id,
+const char *devices_get_name([[maybe_unused]] uint16_t vendor_id,
                                [[maybe_unused]] uint16_t device_id) {
     // Device names come from drivers, not device tree
     return NULL;

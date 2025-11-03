@@ -1,8 +1,8 @@
 #include "virtio_mmio.h"
-#include "../../include/common.h"
+#include "../../common/common.h"
 
 int virtio_mmio_enumerate(const virtio_mmio_config_t *config,
-                          dt_device_callback_t callback,
+                          device_callback_t callback,
                           void *context) {
     if (!config) {
         return 0;
@@ -52,7 +52,7 @@ int virtio_mmio_enumerate(const virtio_mmio_config_t *config,
         }
 
         // Create device info
-        dt_device_t dev_info = {
+        device_t dev_info = {
             .compatible = "virtio,mmio",
             .reg_base = base,
             .reg_size = config->device_size,

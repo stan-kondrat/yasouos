@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../../include/types.h"
-#include "devicetree.h"
+#include "../../common/types.h"
+#include "devices.h"
 
 // VirtIO MMIO registers
 #define VIRTIO_MMIO_MAGIC_VALUE      0x000
@@ -54,5 +54,5 @@ static inline int mmio_read32_safe(uint64_t addr, uint32_t *value) {
  * Enumerate VirtIO MMIO devices
  */
 int virtio_mmio_enumerate(const virtio_mmio_config_t *config,
-                          dt_device_callback_t callback,
+                          device_callback_t callback,
                           void *context);

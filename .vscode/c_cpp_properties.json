@@ -3,9 +3,7 @@
         {
             "name": "YasouOS",
             "includePath": [
-                "${workspaceFolder}/include",
-                "${workspaceFolder}/arch/*/",
-                "${workspaceFolder}/drivers/**"
+                "${workspaceFolder}/**"
             ],
             "defines": [
                 "ARCH_NAME=\"AMD64/x86-64\""

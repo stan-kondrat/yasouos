@@ -1,6 +1,8 @@
 #include "common.h"
-#include "../drivers/drivers.h"
-#include "../drivers/devicetree/devicetree.h"
+#include "platform/platform.h"
+#include "drivers/drivers.h"
+#include "devices/devices.h"
+#include "drivers_config.c"
 
 [[noreturn]] void kernel_main(void) {
 
@@ -16,13 +18,13 @@
     puts("Architecture: "ARCH_NAME"\n\n");
 
     // Register drivers
-    register_drivers();
+    drivers_config_register();
 
     // Scan device tree and count devices
-    devicetree_scan();
+    devices_scan();
 
-    // Probe all devices with registered drivers
-    probe_devices();
+    // Initialize devices with registered drivers
+    drivers_init_devices();
 
     puts("\nSystem halted.\n");
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../include/types.h"
-#include "devicetree/devicetree.h"
+#include "../../common/types.h"
+#include "../devices/devices.h"
 
 // Driver types
 typedef enum {
@@ -29,8 +29,8 @@ typedef struct {
 
 // Driver operations
 typedef struct driver_ops {
-    int (*probe)(const dt_device_t *device);
-    void (*remove)(const dt_device_t *device);
+    int (*probe)(const device_t *device);
+    void (*remove)(const device_t *device);
     const char *name;
 } driver_ops_t;
 
@@ -66,7 +66,7 @@ driver_reg_result_t driver_register(const device_driver_t *driver);
  *
  * @return Number of devices successfully probed
  */
-int driver_probe_all(void);
+int drivers_probe_all(void);
 
 /**
  * Get driver information for a device
@@ -102,3 +102,11 @@ int driver_enable(const char *name, const char *version);
  * @return 0 on success, -1 on failure
  */
 int driver_disable(const char *name, const char *version);
+
+/**
+ * Initialize devices by probing all registered drivers
+ *
+ * Probes all devices found in the device tree and attempts to bind them
+ * to registered drivers. Prints initialization summary.
+ */
+void drivers_init_devices(void);

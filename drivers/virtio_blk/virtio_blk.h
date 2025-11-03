@@ -1,8 +1,8 @@
 #pragma once
 
-#include "../../include/types.h"
-#include "../driver_registry.h"
-#include "../devicetree/devicetree.h"
+#include "../../common/types.h"
+#include "../../kernel/drivers/drivers.h"
+#include "../../kernel/devices/devices.h"
 
 // VirtIO Vendor and Device IDs
 #define VIRTIO_VENDOR_ID           0x1AF4
@@ -10,7 +10,7 @@
 
 // VirtIO Block Device Structure
 typedef struct {
-    dt_device_t dt_dev;
+    device_t device;
     uint64_t io_base;
     int initialized;
 } virtio_blk_device_t;
@@ -27,4 +27,4 @@ driver_reg_result_t virtio_blk_register_driver(void);
  * @param device Device tree device to probe
  * @return 0 on success, -1 on failure
  */
-int virtio_blk_probe(const dt_device_t *device);
+int virtio_blk_probe(const device_t *device);

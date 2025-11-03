@@ -1,4 +1,5 @@
 #include "common.h"
+#include "../kernel/platform/platform.h"
 
 void* memset(void* buf, int c, size_t n) {
     uint8_t* p = (uint8_t*)buf;
