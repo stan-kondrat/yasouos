@@ -4,7 +4,7 @@
 #include "devices/devices.h"
 #include "drivers_config.c"
 
-[[noreturn]] void kernel_main(void) {
+[[noreturn]] void kernel_main(uintptr_t boot_param) {
 
     // Initialize platform-specific hardware
     platform_init();
@@ -15,7 +15,17 @@
     puts("       YasouOS v0.1.0\n");
     puts("==================================\n\n");
     puts("Hello World from YasouOS!\n");
-    puts("Architecture: "ARCH_NAME"\n\n");
+    puts("Architecture: "ARCH_NAME"\n");
+
+    // Get and print kernel command line
+    const char *cmdline = platform_get_cmdline(boot_param);
+    puts("Kernel command line: ");
+    if (cmdline) {
+        puts(cmdline);
+    } else {
+        puts("(none)");
+    }
+    puts("\n\n");
 
     // Register drivers
     drivers_config_register();

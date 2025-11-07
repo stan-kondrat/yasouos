@@ -197,7 +197,7 @@ LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 DRIVER_DIR := drivers
 
 # Search paths for source files
-vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/drivers $(DRIVER_DIR) \
+vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/drivers kernel/platform $(DRIVER_DIR) \
           $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng
 vpath %.S $(ARCH_DIR)
 
@@ -214,9 +214,11 @@ C_SOURCES += kernel/devices/devices_amd64.c
 else ifeq ($(ARCH),arm64)
 C_SOURCES += kernel/devices/devices_arm64.c
 C_SOURCES += kernel/devices/virtio_mmio.c
+C_SOURCES += kernel/platform/fdt_parser.c
 else ifeq ($(ARCH),riscv)
 C_SOURCES += kernel/devices/devices_riscv.c
 C_SOURCES += kernel/devices/virtio_mmio.c
+C_SOURCES += kernel/platform/fdt_parser.c
 endif
 ASM_SOURCES := $(ARCH_DIR)/boot_kernel.S
 ifeq ($(ARCH),amd64)

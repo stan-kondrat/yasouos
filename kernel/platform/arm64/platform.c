@@ -1,5 +1,6 @@
 #include "common.h"
 #include "../platform.h"
+#include "../fdt_parser.h"
 
 void platform_init(void)
 {
@@ -38,4 +39,9 @@ void platform_halt(void)
     {
         __asm__ volatile("wfe");
     }
+}
+
+const char* platform_get_cmdline(uintptr_t boot_param) {
+    // Use FDT parser to extract bootargs from device tree
+    return fdt_get_bootargs(boot_param);
 }

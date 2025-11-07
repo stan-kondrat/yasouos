@@ -22,7 +22,11 @@
 
 _start:
     # We start in 32-bit mode from multiboot
+    # ebx contains multiboot info pointer - save it
     cli
+
+    # Save multiboot info pointer before clobbering ebx
+    movl %ebx, %esi
 
     # Setup stack pointer
     movl $__stack_top, %esp
@@ -34,8 +38,10 @@ _start:
     xorl %eax, %eax
     rep stosb
 
-    # Call kernel main (staying in 32-bit mode for QEMU compatibility)
+    # Pass multiboot info pointer as first argument to kernel_main
+    pushl %esi
     call kernel_main
+    addl $4, %esp
 
     # Should never return, but if it does, halt
 1:  hlt

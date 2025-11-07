@@ -96,6 +96,10 @@ The build system automatically detects available cross-compilers:
 - **ARM64**: `aarch64-elf-gcc` or `aarch64-linux-gnu-gcc`
 - **AMD64**: `x86_64-elf-gcc`, `x86_64-linux-gnu-gcc`, or native `gcc` (on x86_64)
 
+## Documentation
+
+- [Kernel Command Line Arguments](docs/kernel-command-line.md) - Examples for RISC-V, ARM64, and AMD64
+
 ## Thanks
 - Inspired by https://github.com/nuta/operating-system-in-1000-lines
 - Claude Code for development assistance

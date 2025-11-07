@@ -1,4 +1,35 @@
 #include "common.h"
+#include "../platform.h"
+
+// Multiboot info structure (partial - only what we need)
+typedef struct {
+    uint32_t flags;
+    uint32_t mem_lower;
+    uint32_t mem_upper;
+    uint32_t boot_device;
+    uint32_t cmdline;      // Physical address of command line string
+    // ... other fields we don't need
+} __attribute__((packed)) multiboot_info_t;
+
+// PVH start info structure
+// See https://xenbits.xen.org/docs/unstable/misc/pvh.html
+// See xen/include/public/arch-x86/hvm/start_info.h
+typedef struct {
+    uint32_t magic;         // Magic value: 0x336ec578 ("xEn3")
+    uint32_t version;       // Version of this structure
+    uint32_t flags;         // SIF_xxx flags
+    uint32_t nr_modules;    // Number of modules passed to kernel
+    uint64_t modlist_paddr; // Physical address of hvm_modlist_entry array
+    uint64_t cmdline_paddr; // Physical address of command line
+    uint64_t rsdp_paddr;    // Physical address of RSDP ACPI structure
+    uint64_t memmap_paddr;  // Physical address of memory map (version >= 1)
+    uint32_t memmap_entries;// Number of entries in memory map
+    uint32_t reserved;      // Must be zero
+} __attribute__((packed)) hvm_start_info_t;
+
+// Magic values
+#define MULTIBOOT_FLAG_CMDLINE (1 << 2)
+#define PVH_MAGIC 0x336ec578  // PVH start info magic
 
 // I/O port operations
 static inline void outb(uint16_t port, uint8_t value) {
@@ -53,4 +84,30 @@ void platform_halt(void) {
     for (;;) {
         __asm__ __volatile__("hlt");
     }
+}
+
+const char* platform_get_cmdline(uintptr_t boot_param) {
+    if (boot_param == 0) {
+        return NULL;
+    }
+
+    // Try PVH protocol first
+    hvm_start_info_t *pvh = (hvm_start_info_t *)boot_param;
+    if (pvh->magic == PVH_MAGIC) {
+        if (pvh->cmdline_paddr == 0) {
+            return NULL;
+        }
+        return (const char *)(uintptr_t)pvh->cmdline_paddr;
+    }
+
+    // Try Multiboot protocol as fallback
+    multiboot_info_t *mbi = (multiboot_info_t *)boot_param;
+    if ((mbi->flags & MULTIBOOT_FLAG_CMDLINE)) {
+        if (mbi->cmdline == 0) {
+            return NULL;
+        }
+        return (const char *)(uintptr_t)mbi->cmdline;
+    }
+
+    return NULL;
 }

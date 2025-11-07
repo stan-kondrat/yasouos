@@ -2,6 +2,12 @@
 .global _start
 
 _start:
+    // a0 and a1 contain boot parameters from OpenSBI
+    // a0 = hart ID, a1 = device tree pointer
+    // Save both before they get clobbered
+    mv s0, a0      // Save hart ID (for debugging)
+    mv s1, a1      // Save device tree pointer
+
     // Setup stack pointer
     la sp, __stack_top
 
@@ -17,7 +23,8 @@ _start:
     j 1b
 2:
 
-    // Jump to kernel main
+    // Pass device tree pointer as first argument to kernel_main
+    mv a0, s1      // Pass FDT pointer (was in a1 at entry)
     call kernel_main
 
     // Should never return, but if it does, halt
