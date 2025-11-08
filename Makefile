@@ -33,7 +33,7 @@ ARCH_arm64_NAME := "ARM64/AArch64"
 ARCH_amd64_CC := $(shell which x86_64-elf-gcc 2>/dev/null || which x86_64-linux-gnu-gcc 2>/dev/null || which gcc 2>/dev/null || echo x86_64-elf-gcc)
 ARCH_amd64_FLAGS := -m32
 ARCH_amd64_QEMU := qemu-system-x86_64
-ARCH_amd64_QEMU_FLAGS := -machine q35 -cpu qemu64 -m 128M -device isa-debug-exit,iobase=0xf4,iosize=0x04
+ARCH_amd64_QEMU_FLAGS := -machine pc -cpu qemu64 -m 128M -device isa-debug-exit,iobase=0xf4,iosize=0x04
 ARCH_amd64_QEMU_FLAGS_IMG := -machine pc -cpu qemu64 -m 128M -device isa-debug-exit,iobase=0xf4,iosize=0x04
 ARCH_amd64_NAME := "AMD64/x86-64"
 
@@ -95,7 +95,6 @@ help:
 	@echo "  run        - Build and run in QEMU (requires ARCH)"
 	@echo "  run-img    - Run bootable disk image interactively (requires ARCH)"
 	@echo "  test       - Test kernel(s)"
-	@echo "  test-img   - Test bootable disk images"
 	@echo "  clean      - Remove build files"
 	@echo "  check-deps - Check build dependencies"
 	@echo ""
@@ -286,9 +285,18 @@ $(BOOTLOADER): $(ARCH_DIR)/boot_disk.S | $(BUILD_DIR)
 	$(AS) --32 -o $(BUILD_DIR)/bootloader_temp.o -defsym BOOTLOADER_ONLY=1 $<
 	$(LD) -m elf_i386 --oformat binary -Ttext 0x7C00 -o $@ $(BUILD_DIR)/bootloader_temp.o
 	@dd if=$@ of=$@.tmp bs=510 count=1 2>/dev/null
-	@printf '\x55\xAA' >> $@.tmp
+	@printf '\125\252' >> $@.tmp
 	@mv $@.tmp $@
 	@echo "$(GREEN)Bootloader built: $@ (512 bytes)$(NC)"
+	@if [ -n "$$CI" ]; then \
+		echo "$(BLUE)[CI DEBUG] Bootloader details:$(NC)"; \
+		ls -l $@; \
+		file $@; \
+		echo "First 32 bytes:"; \
+		xxd $@ | head -2; \
+		echo "Last 32 bytes:"; \
+		xxd $@ | tail -2; \
+	fi
 
 $(DISK_IMG): $(BOOTLOADER) $(KERNEL_DISK_BIN)
 	@echo "$(BLUE)Creating AMD64 disk image...$(NC)"
@@ -296,6 +304,12 @@ $(DISK_IMG): $(BOOTLOADER) $(KERNEL_DISK_BIN)
 	dd if=$(BOOTLOADER) of=$@ bs=512 count=1 conv=notrunc 2>/dev/null
 	dd if=$(KERNEL_DISK_BIN) of=$@ bs=512 seek=1 conv=notrunc 2>/dev/null
 	@echo "$(GREEN)Disk image created: $@$(NC)"
+	@if [ -n "$$CI" ]; then \
+		echo "$(BLUE)[CI DEBUG] Disk image details:$(NC)"; \
+		ls -l $@; \
+		echo "Boot sector (first 512 bytes):"; \
+		xxd $@ | head -32; \
+	fi
 else
 $(DISK_IMG): $(KERNEL_BIN)
 	@echo "$(BLUE)Creating $(ARCH) disk image...$(NC)"
@@ -305,7 +319,7 @@ $(DISK_IMG): $(KERNEL_BIN)
 endif
 
 # Implementation targets
-.PHONY: _do_build _do_test _do_test-img _do_run _do_run-img _do_check_deps
+.PHONY: _do_build _do_test _do_run _do_run-img _do_check_deps
 _do_build: $(KERNEL_ELF) $(DISK_IMG)
 
 _do_run: $(KERNEL_ELF)
@@ -322,29 +336,8 @@ else
 	@echo "$(YELLOW)Not implemented yet.$(NC)"
 endif
 
-_do_test: $(KERNEL_ELF)
-	@echo "$(BLUE)Testing YasouOS ($(ARCH))...$(NC)"
-	@{ $(QEMU) $(QEMU_FLAGS) -kernel $(KERNEL_ELF) -nographic --no-reboot 2>&1 || true; } | tee $(BUILD_DIR)/test-$(ARCH).log
-	@if grep -q "Hello World from YasouOS!" $(BUILD_DIR)/test-$(ARCH).log; then \
-		echo "$(GREEN)✓ Test passed for $(ARCH)$(NC)"; \
-	else \
-		echo "$(RED)✗ Test failed for $(ARCH)$(NC)"; \
-		exit 1; \
-	fi
-
-_do_test-img: $(DISK_IMG)
-	@echo "$(BLUE)Testing $(ARCH) disk image in QEMU...$(NC)"
-ifeq ($(ARCH),amd64)
-	@{ $(QEMU) $(QEMU_FLAGS_IMG) -drive file=$(DISK_IMG),format=raw -nographic --no-reboot || true; } 2>&1 | tee $(BUILD_DIR)/test-img-$(ARCH).log
-else
-	@echo "$(YELLOW)Not implemented yet.$(NC)"
-endif
-	@if grep -q "Hello World from YasouOS!" $(BUILD_DIR)/test-img-$(ARCH).log; then \
-		echo "$(GREEN)✓ Disk image test passed for $(ARCH)$(NC)"; \
-	else \
-		echo "$(RED)✗ Disk image test failed for $(ARCH)$(NC)"; \
-		exit 1; \
-	fi
+_do_test: $(KERNEL_ELF) $(DISK_IMG)
+	@./tests/_run-all.sh $(ARCH)
 
 _do_check_deps:
 	@echo "$(BLUE)Checking $(ARCH) dependencies...$(NC)"

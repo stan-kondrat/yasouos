@@ -69,8 +69,6 @@ make test               # Test all architectures
 make ARCH=riscv test    # Test RISC-V only
 make ARCH=arm64 test    # Test ARM64 only
 make ARCH=amd64 test    # Test AMD64 only
-make test-img           # Test disk images for all architectures
-make ARCH=amd64 test-img # Test AMD64 disk image only
 
 # Utility commands
 make check-deps         # Check dependencies for all architectures
