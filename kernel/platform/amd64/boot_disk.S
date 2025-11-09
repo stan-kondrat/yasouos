@@ -23,6 +23,8 @@ _start:
     movb $0, %dh
     movb $0x80, %dl
     movw $0x8000, %bx
+    xorw %di, %di
+    movw %di, %es
     int $0x13
 
     jc disk_error
@@ -45,7 +47,7 @@ print_string_boot:
     ret
 
 error_msg:
-    .asciz "Disk error!"
+    .asciz "Disk error!\r\n"
 
 .org 510
 .word 0xAA55
@@ -105,7 +107,7 @@ gdt:
     # NULL descriptor
     .quad 0
 
-    # Code segment (0x08)
+    # 32-bit Code segment (0x08)
     .word 0xFFFF      # limit low
     .word 0x0000      # base low
     .byte 0x00        # base middle
@@ -113,7 +115,7 @@ gdt:
     .byte 0xCF        # flags + limit high
     .byte 0x00        # base high
 
-    # Data segment (0x10)
+    # 32-bit Data segment (0x10)
     .word 0xFFFF      # limit low
     .word 0x0000      # base low
     .byte 0x00        # base middle
@@ -121,9 +123,29 @@ gdt:
     .byte 0xCF        # flags + limit high
     .byte 0x00        # base high
 
+    # 64-bit Code segment (0x18)
+    .word 0x0000
+    .word 0x0000
+    .byte 0x00
+    .byte 0x9A
+    .byte 0x20
+    .byte 0x00
+
+    # 64-bit Data segment (0x20)
+    .word 0x0000
+    .word 0x0000
+    .byte 0x00
+    .byte 0x92
+    .byte 0x00
+    .byte 0x00
+
 gdtptr:
     .word gdt_end - gdt - 1
     .long gdt
+
+gdtptr64:
+    .word gdt_end - gdt - 1
+    .quad gdt
 gdt_end:
 
 .code32
@@ -136,20 +158,72 @@ protected_mode:
     movw %ax, %gs
     movw %ax, %ss
 
-    # Set up stack
-    movl $__stack_top, %esp
-
-    # Clear BSS
-    movl $__bss, %edi
-    movl $__bss_end, %ecx
-    subl %edi, %ecx
+    # Set up identity paging for first 2MB
+    # PML4 at 0x1000
+    movl $0x1000, %edi
+    movl %edi, %cr3
     xorl %eax, %eax
+    movl $4096, %ecx
+    rep stosl
+    movl %cr3, %edi
+
+    # PML4[0] -> PDPT
+    movl $0x2003, (%edi)
+    addl $0x1000, %edi
+
+    # PDPT[0] -> PD
+    movl $0x3003, (%edi)
+    addl $0x1000, %edi
+
+    # PD[0] -> 2MB page
+    movl $0x0083, (%edi)
+
+    # Enable PAE
+    movl %cr4, %eax
+    orl $0x20, %eax
+    movl %eax, %cr4
+
+    # Enable long mode in EFER MSR
+    movl $0xC0000080, %ecx
+    rdmsr
+    orl $0x100, %eax
+    wrmsr
+
+    # Enable paging
+    movl %cr0, %eax
+    orl $0x80000000, %eax
+    movl %eax, %cr0
+
+    # Load 64-bit GDT
+    lgdt gdtptr64
+
+    # Far jump to 64-bit code
+    ljmp $0x18, $long_mode
+
+.code64
+long_mode:
+    # Set up 64-bit segments
+    movw $0x20, %ax
+    movw %ax, %ds
+    movw %ax, %es
+    movw %ax, %fs
+    movw %ax, %gs
+    movw %ax, %ss
+
+    # Setup stack pointer
+    movq $__stack_top, %rsp
+
+    # Clear BSS section
+    movq $__bss, %rdi
+    movq $__bss_end, %rcx
+    subq %rdi, %rcx
+    xorq %rax, %rax
     rep stosb
 
-    # Call kernel
+    # Call kernel_main
     call kernel_main
 
-    # Halt if kernel returns
+    # Should never return, but if it does, halt
 1:  hlt
     jmp 1b
 .endif

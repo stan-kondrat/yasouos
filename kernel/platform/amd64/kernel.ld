@@ -1,5 +1,5 @@
-OUTPUT_FORMAT("elf32-i386")
-OUTPUT_ARCH("i386")
+OUTPUT_FORMAT("elf64-x86-64")
+OUTPUT_ARCH("i386:x86-64")
 
 /* Support both multiboot (0x100000) and disk boot (0x8000) */
 SECTIONS {
@@ -30,15 +30,15 @@ SECTIONS {
         *(.text .text.*)
     }
 
-    .rodata : ALIGN(4) {
+    .rodata : ALIGN(8) {
         *(.rodata .rodata.*)
     }
 
-    .data : ALIGN(4) {
+    .data : ALIGN(8) {
         *(.data .data.*)
     }
 
-    .bss : ALIGN(4) {
+    .bss : ALIGN(8) {
         __bss = .;
         *(.bss .bss.* .sbss .sbss.*)
         *(COMMON)

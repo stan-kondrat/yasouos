@@ -1,7 +1,7 @@
 ENTRY(_start)
 
 SECTIONS {
-    . = 0x40080000;  /* QEMU virt machine kernel load address for ARM64 */
+    . = 0x40200000;  /* QEMU virt machine kernel load address for ARM64 (RAM base 0x40000000 + 2MB offset) */
 
     .text : {
         KEEP(*(.text.boot))

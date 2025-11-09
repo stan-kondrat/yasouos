@@ -31,7 +31,7 @@ ARCH_arm64_QEMU_FLAGS_IMG := -machine virt -cpu cortex-a53
 ARCH_arm64_NAME := "ARM64/AArch64"
 
 ARCH_amd64_CC := $(shell which x86_64-elf-gcc 2>/dev/null || which x86_64-linux-gnu-gcc 2>/dev/null || which gcc 2>/dev/null || echo x86_64-elf-gcc)
-ARCH_amd64_FLAGS := -m32 -mno-sse
+ARCH_amd64_FLAGS := -mcmodel=kernel -mno-red-zone
 ARCH_amd64_QEMU := qemu-system-x86_64
 ARCH_amd64_QEMU_FLAGS := -machine pc -cpu qemu64 -m 128M -device isa-debug-exit,iobase=0xf4,iosize=0x04
 ARCH_amd64_QEMU_FLAGS_IMG := -machine pc -cpu qemu64 -m 128M -device isa-debug-exit,iobase=0xf4,iosize=0x04
