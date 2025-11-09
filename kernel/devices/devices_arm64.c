@@ -1,17 +1,41 @@
 #include "devices.h"
 #include "virtio_mmio.h"
+#include "../platform/fdt_parser.h"
 #include "../../common/common.h"
 
-// ARM64 QEMU virt machine - VirtIO MMIO devices
-// QEMU places up to 32 virtio-mmio devices at these addresses
-static const virtio_mmio_config_t arm64_config = {
-    .base_addr = 0x0a000000,
-    .device_size = 0x200,
-    .device_count = 32
-};
+// Callback wrapper to probe VirtIO devices from FDT
+static void probe_virtio_callback(const device_t *device, void *context) {
+    // Only process virtio,mmio devices
+    if (!device->compatible || strcmp(device->compatible, "virtio,mmio") != 0) {
+        // Pass through non-VirtIO devices directly
+        device_callback_t user_callback = (device_callback_t)context;
+        if (user_callback) {
+            user_callback(device, NULL);
+        }
+        return;
+    }
 
-int devices_enumerate(device_callback_t callback, void *context) {
-    return virtio_mmio_enumerate(&arm64_config, callback, context);
+    // Create a mutable copy to probe
+    device_t mutable_device = *device;
+
+    // Probe the VirtIO device to get vendor/device IDs
+    if (virtio_mmio_probe_device(&mutable_device) == 0) {
+        // Successfully probed - pass to user callback
+        device_callback_t user_callback = (device_callback_t)context;
+        if (user_callback) {
+            user_callback(&mutable_device, NULL);
+        }
+    }
+}
+
+int devices_enumerate(device_callback_t callback, [[maybe_unused]] void *context) {
+    uintptr_t fdt_addr = device_get_fdt();
+    if (fdt_addr == 0) {
+        return 0;
+    }
+
+    // Use FDT enumeration with VirtIO probing wrapper
+    return fdt_enumerate_devices(fdt_addr, probe_virtio_callback, (void*)callback);
 }
 
 int devices_find([[maybe_unused]] const char *compatible,

@@ -83,10 +83,10 @@ _start:
     # Load 64-bit GDT
     lgdt gdtptr64
 
-    # Far jump to 64-bit code
-    pushl %edi
+    # Far jump to 64-bit code using retf (pops CS:EIP)
+    pushl $0x18
     pushl $long_mode
-    ljmp $0x18, $long_mode
+    lret
 
 .align 8
 gdt:
@@ -137,9 +137,6 @@ boot_info_copy:
 
 .code64
 long_mode:
-    # Check if we have boot info (1 = yes, 0 = no)
-    popq %rax
-
     # Set up 64-bit segments
     movw $0x20, %ax
     movw %ax, %ds
@@ -151,8 +148,14 @@ long_mode:
     # Setup stack pointer
     movq $__stack_top, %rsp
 
-    # Set boot parameter to boot_info_copy if we have boot info
-    testq %rax, %rax
+    # Restore boot info flag from safe location (pushed at line 47)
+    # Use stack manipulation to recover %edi saved before entering 32-bit paging setup
+    # Since we're now in 64-bit mode after mode switch, recover from saved location
+    # Actually, %edi was NOT pushed on the 64-bit stack - it was lost during mode switch
+    # Instead, use boot_info_copy address if it contains valid data
+    # Check first dword of boot_info_copy - if non-zero, we copied data there
+    movl boot_info_copy, %eax
+    testl %eax, %eax
     jz .no_param
     movabsq $boot_info_copy, %rdi
     jmp .have_param

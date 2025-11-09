@@ -2,8 +2,8 @@
 #include "platform/platform.h"
 #include "drivers/drivers.h"
 #include "devices/devices.h"
-#include "drivers_config.c"
 #include "init_apps.c"
+#include "init_drivers.c"
 
 [[noreturn]] void kernel_main(uintptr_t boot_param) {
 
@@ -32,12 +32,15 @@
     init_apps(cmdline);
 
     // Register drivers
-    drivers_config_register();
+    init_drivers();
 
-    // Scan device tree and count devices
+    // Scan device tree and print
+    device_set_fdt(boot_param);
     devices_scan();
+    device_tree_print();
 
     // Initialize devices with registered drivers
+    puts("\n");
     drivers_init_devices();
 
     puts("\nSystem halted.\n");

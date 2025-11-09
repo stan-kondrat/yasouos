@@ -9,6 +9,7 @@ typedef enum {
     DRIVER_TYPE_STORAGE,
     DRIVER_TYPE_DISPLAY,
     DRIVER_TYPE_INPUT,
+    DRIVER_TYPE_RANDOM,
     DRIVER_TYPE_UNKNOWN
 } driver_type_t;
 

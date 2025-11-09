@@ -60,14 +60,23 @@ int devices_enumerate(device_callback_t callback, void *context) {
 
             // AMD64/PCI doesn't use compatible strings - just vendor/device IDs
             device_t dev_info = {
-                .compatible = NULL,        // No compatible string for PCI
-                .reg_base = bar0 & 0xFFFC, // I/O port base
-                .reg_size = 0,             // Unknown for PCI
+                .compatible = NULL,
+                .name = NULL,
+                .reg_base = bar0 & 0xFFFC,
+                .reg_size = 0,
                 .vendor_id = vendor,
                 .device_id = device_val,
                 .bus = bus,
-                .device = device,
-                .function = 0
+                .device_num = device,
+                .function = 0,
+                .driver = NULL,
+                .state = 0,
+                .mmio_virt = NULL,
+                .parent = NULL,
+                .first_child = NULL,
+                .next_sibling = NULL,
+                .depth = 0,
+                .next = NULL
             };
 
             if (callback) {

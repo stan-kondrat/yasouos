@@ -17,21 +17,26 @@ NC := \033[0m
 
 # Architecture configuration
 ARCH_riscv_CC := $(shell which riscv64-elf-gcc 2>/dev/null || which riscv64-linux-gnu-gcc 2>/dev/null || echo riscv64-elf-gcc)
-ARCH_riscv_FLAGS := -march=rv64ima -mabi=lp64 -mcmodel=medany -mno-relax -fno-strict-aliasing
+# _zicsr: CSR instructions (required for newer GCC, was implicit in older versions)
+ARCH_riscv_FLAGS := -march=rv64ima_zicsr -mabi=lp64 -mcmodel=medany -mno-relax -fno-strict-aliasing
 ARCH_riscv_QEMU := qemu-system-riscv64
 ARCH_riscv_QEMU_FLAGS := -machine virt -bios default
 ARCH_riscv_QEMU_FLAGS_IMG := -machine virt -bios default
 ARCH_riscv_NAME := "RISC-V 64-bit"
 
 ARCH_arm64_CC := $(shell which aarch64-elf-gcc 2>/dev/null || which aarch64-linux-gnu-gcc 2>/dev/null || echo aarch64-elf-gcc)
-ARCH_arm64_FLAGS := -march=armv8-a -mabi=lp64
+# +nolse: disable Large System Extensions (not available on cortex-a53)
+# -mgeneral-regs-only: avoid SIMD/FP registers (no exception context saving needed)
+# -mno-outline-atomics: inline atomic ops instead of library calls
+ARCH_arm64_FLAGS := -march=armv8-a+nolse -mabi=lp64 -mgeneral-regs-only -mno-outline-atomics
 ARCH_arm64_QEMU := qemu-system-aarch64
 ARCH_arm64_QEMU_FLAGS := -machine virt -cpu cortex-a53
 ARCH_arm64_QEMU_FLAGS_IMG := -machine virt -cpu cortex-a53
 ARCH_arm64_NAME := "ARM64/AArch64"
 
 ARCH_amd64_CC := $(shell which x86_64-elf-gcc 2>/dev/null || which x86_64-linux-gnu-gcc 2>/dev/null || which gcc 2>/dev/null || echo x86_64-elf-gcc)
-ARCH_amd64_FLAGS := -mcmodel=kernel -mno-red-zone
+# -mno-sse -mno-sse2: disable SSE instructions (no exception context saving needed)
+ARCH_amd64_FLAGS := -mcmodel=kernel -mno-red-zone -mno-sse -mno-sse2
 ARCH_amd64_QEMU := qemu-system-x86_64
 ARCH_amd64_QEMU_FLAGS := -machine pc -cpu qemu64 -m 128M -device isa-debug-exit,iobase=0xf4,iosize=0x04
 ARCH_amd64_QEMU_FLAGS_IMG := -machine pc -cpu qemu64 -m 128M -device isa-debug-exit,iobase=0xf4,iosize=0x04
@@ -210,16 +215,14 @@ C_SOURCES += $(DRIVER_DIR)/virtio_rng/virtio_rng.c
 
 # Device tree implementation (common + architecture-specific)
 C_SOURCES += kernel/devices/devices.c
+C_SOURCES += kernel/platform/fdt_parser.c
+C_SOURCES += kernel/devices/virtio_mmio.c
 ifeq ($(ARCH),amd64)
 C_SOURCES += kernel/devices/devices_amd64.c
 else ifeq ($(ARCH),arm64)
 C_SOURCES += kernel/devices/devices_arm64.c
-C_SOURCES += kernel/devices/virtio_mmio.c
-C_SOURCES += kernel/platform/fdt_parser.c
 else ifeq ($(ARCH),riscv)
 C_SOURCES += kernel/devices/devices_riscv.c
-C_SOURCES += kernel/devices/virtio_mmio.c
-C_SOURCES += kernel/platform/fdt_parser.c
 endif
 ASM_SOURCES := $(ARCH_DIR)/boot_kernel.S
 ifeq ($(ARCH),amd64)

@@ -24,6 +24,17 @@ driver_reg_result_t driver_register(const device_driver_t *driver) {
         return DRIVER_REG_ERROR_FULL;
     }
 
+    // Call init hook if provided
+    if (driver->init) {
+        int result = driver->init();
+        if (result != 0) {
+            puts("  ! Init hook failed for ");
+            puts(driver->name);
+            puts("\n");
+            return DRIVER_REG_ERROR_NULL;
+        }
+    }
+
     // Add to registry
     driver_states[driver_count].driver = driver;
     driver_states[driver_count].enabled = 1;
@@ -65,6 +76,9 @@ static int device_matches_driver(const device_t *device, const device_driver_t *
 static void probe_device_callback(const device_t *device, void *context) {
     int *probe_count = (int *)context;
 
+    // Cast away const - we know this is actually a mutable device from the registry
+    device_t *mutable_device = (device_t *)device;
+
     for (int i = 0; i < driver_count; i++) {
         driver_state_t *state = &driver_states[i];
         const device_driver_t *driver = state->driver;
@@ -79,6 +93,10 @@ static void probe_device_callback(const device_t *device, void *context) {
                 int result = driver->ops->probe(device);
                 if (result == 0) {
                     (*probe_count)++;
+
+                    // Update device state directly (no search needed)
+                    device_set_driver(mutable_device, (device_driver_t *)driver);
+                    mutable_device->state = DEVICE_STATE_BOUND;
 
                     // Print which device was initialized
                     puts("  - ");

@@ -4,7 +4,7 @@
 #include "../drivers/virtio_rng/virtio_rng.h"
 #include "../drivers/virtio_blk/virtio_blk.h"
 
-void drivers_config_register(void) {
+void init_drivers(void) {
     puts("Registering drivers...\n");
 
     virtio_net_register_driver();

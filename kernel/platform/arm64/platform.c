@@ -49,17 +49,38 @@ const char* platform_get_cmdline(uintptr_t boot_param) {
 // Exception handler for unknown instruction
 void exception_unknown_instruction(void) {
     uint64_t elr;
+    uint64_t esr;
     uint32_t instruction;
 
     // Read ELR_EL1 (Exception Link Register - contains the faulting PC)
     __asm__ volatile("mrs %0, elr_el1" : "=r"(elr));
 
+    // Read ESR_EL1 (Exception Syndrome Register - contains exception info)
+    __asm__ volatile("mrs %0, esr_el1" : "=r"(esr));
+
     // Read the instruction at the faulting address
     instruction = *(volatile uint32_t*)elr;
 
-    puts("\n[EXCEPTION] Unknown/Illegal Instruction\n");
-    puts("The CPU encountered an instruction it does not recognize.\n");
-    puts("Address: 0x");
+    uint32_t ec = (esr >> 26) & 0x3F; // Exception Class
+    uint32_t iss = esr & 0x1FFFFFF;   // Instruction Specific Syndrome
+
+    puts("\n[EXCEPTION] ");
+    if (ec == 0x00) {
+        puts("Unknown/Illegal Instruction\n");
+    } else if (ec == 0x0E) {
+        puts("Illegal Instruction\n");
+    } else if (ec == 0x24 || ec == 0x25) {
+        puts("Data Abort\n");
+    } else if (ec == 0x20 || ec == 0x21) {
+        puts("Instruction Abort\n");
+    } else {
+        puts("Unknown Exception\n");
+    }
+    puts("EC=0x");
+    put_hex8((uint8_t)ec);
+    puts(" ISS=0x");
+    put_hex32(iss);
+    puts("\nAddress: 0x");
     put_hex32((uint32_t)(elr >> 32));
     put_hex32((uint32_t)elr);
     puts("\nInstruction: 0x");

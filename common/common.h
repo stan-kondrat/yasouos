@@ -15,3 +15,4 @@ void puts(const char* s);
 void put_hex8(uint8_t value);
 void put_hex16(uint16_t value);
 void put_hex32(uint32_t value);
+void put_hex64(uint64_t value);

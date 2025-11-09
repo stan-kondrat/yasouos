@@ -46,9 +46,16 @@ static inline int mmio_read32_safe(uint64_t addr, uint32_t *value) {
         return -1;
     }
 
-    *value = *(volatile uint32_t *)addr;
+    *value = *(volatile uint32_t *)(uintptr_t)addr;
     return 0;
 }
+
+/**
+ * Probe a single VirtIO MMIO device and populate vendor/device IDs
+ * @param device Device structure to populate
+ * @return 0 if valid VirtIO device, -1 otherwise
+ */
+int virtio_mmio_probe_device(device_t *device);
 
 /**
  * Enumerate VirtIO MMIO devices

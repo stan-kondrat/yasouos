@@ -75,3 +75,8 @@ void put_hex32(uint32_t value) {
     putchar(hex_chars[(value >> 4) & 0xF]);
     putchar(hex_chars[value & 0xF]);
 }
+
+void put_hex64(uint64_t value) {
+    put_hex32((uint32_t)(value >> 32));
+    put_hex32((uint32_t)(value & 0xFFFFFFFF));
+}
