@@ -48,6 +48,9 @@ static inline uint8_t inb(uint16_t port) {
 #define COM1_LSR  (COM1_BASE + 5)
 #define LSR_THRE  0x20  // Transmitter holding register empty
 
+// Forward declaration
+static void platform_setup_exception_handlers(void);
+
 void platform_init(void) {
     // Initialize COM1 serial port
     outb(COM1_BASE + 1, 0x00);  // Disable interrupts
@@ -57,6 +60,9 @@ void platform_init(void) {
     outb(COM1_BASE + 3, 0x03);  // 8 bits, no parity, one stop bit
     outb(COM1_BASE + 2, 0xC7);  // Enable FIFO, clear them, with 14-byte threshold
     outb(COM1_BASE + 4, 0x0B);  // IRQs enabled, RTS/DSR set
+
+    // Setup exception handlers
+    platform_setup_exception_handlers();
 }
 
 void platform_putchar(char ch) {
@@ -110,4 +116,116 @@ const char* platform_get_cmdline(uintptr_t boot_param) {
     }
 
     return NULL;
+}
+
+// IDT entry structure (64-bit)
+typedef struct {
+    uint16_t offset_low;    // Offset bits 0-15
+    uint16_t selector;      // Code segment selector
+    uint8_t  ist;           // Interrupt Stack Table offset
+    uint8_t  type_attr;     // Type and attributes
+    uint16_t offset_mid;    // Offset bits 16-31
+    uint32_t offset_high;   // Offset bits 32-63
+    uint32_t reserved;      // Reserved (must be 0)
+} __attribute__((packed)) idt_entry_t;
+
+// IDT pointer structure
+typedef struct {
+    uint16_t limit;
+    uint64_t base;
+} __attribute__((packed)) idt_ptr_t;
+
+// IDT with 256 entries
+static idt_entry_t idt[256];
+static idt_ptr_t idt_ptr;
+
+// Exception handler for invalid opcode (#UD - exception 6)
+void exception_invalid_opcode_handler(void) {
+    puts("\n[EXCEPTION] Unknown/Illegal Instruction\n");
+    puts("The CPU encountered an instruction it does not recognize.\n");
+    puts("System halted.\n");
+    platform_halt();
+}
+
+// Assembly stub for invalid opcode exception
+// The CPU automatically pushes error code and return address
+__asm__(
+    ".global exception_stub_ud\n"
+    ".align 16\n"
+    "exception_stub_ud:\n"
+    // No error code for #UD, so we don't need to pop it
+    // Save registers
+    "    pushq %rax\n"
+    "    pushq %rbx\n"
+    "    pushq %rcx\n"
+    "    pushq %rdx\n"
+    "    pushq %rsi\n"
+    "    pushq %rdi\n"
+    "    pushq %rbp\n"
+    "    pushq %r8\n"
+    "    pushq %r9\n"
+    "    pushq %r10\n"
+    "    pushq %r11\n"
+    "    pushq %r12\n"
+    "    pushq %r13\n"
+    "    pushq %r14\n"
+    "    pushq %r15\n"
+    // Call C handler
+    "    call exception_invalid_opcode_handler\n"
+    // Should never return, but if it does, restore and iret
+    "    popq %r15\n"
+    "    popq %r14\n"
+    "    popq %r13\n"
+    "    popq %r12\n"
+    "    popq %r11\n"
+    "    popq %r10\n"
+    "    popq %r9\n"
+    "    popq %r8\n"
+    "    popq %rbp\n"
+    "    popq %rdi\n"
+    "    popq %rsi\n"
+    "    popq %rdx\n"
+    "    popq %rcx\n"
+    "    popq %rbx\n"
+    "    popq %rax\n"
+    "    iretq\n"
+);
+
+extern void exception_stub_ud(void);
+
+// Set IDT entry
+static void idt_set_entry(uint8_t vector, uint64_t handler, uint16_t selector, uint8_t type_attr) {
+    idt[vector].offset_low = handler & 0xFFFF;
+    idt[vector].offset_mid = (handler >> 16) & 0xFFFF;
+    idt[vector].offset_high = (handler >> 32) & 0xFFFFFFFF;
+    idt[vector].selector = selector;
+    idt[vector].ist = 0;
+    idt[vector].type_attr = type_attr;
+    idt[vector].reserved = 0;
+}
+
+static void platform_setup_exception_handlers(void) {
+    // Clear IDT - avoid memset due to potential issues with large buffers
+    for (int i = 0; i < 256; i++) {
+        idt[i].offset_low = 0;
+        idt[i].offset_mid = 0;
+        idt[i].offset_high = 0;
+        idt[i].selector = 0;
+        idt[i].ist = 0;
+        idt[i].type_attr = 0;
+        idt[i].reserved = 0;
+    }
+
+    // Set up IDT entry for invalid opcode (#UD - exception 6)
+    // Type: 0x8E = Present, DPL=0, Type=Interrupt Gate (64-bit)
+    // Selector: 0x18 = 64-bit Code segment (assuming GDT layout: null, code32, data32, code64)
+    // Note: This assumes the GDT has 64-bit code segment at index 3 (0x18 = 3 * 8)
+    idt_set_entry(6, (uint64_t)(uintptr_t)exception_stub_ud, 0x18, 0x8E);
+
+    // Load IDT
+    idt_ptr.limit = sizeof(idt) - 1;
+    idt_ptr.base = (uint64_t)(uintptr_t)&idt;
+    __asm__ __volatile__("lidt %0" : : "m"(idt_ptr));
+
+    puts("[AMD64] Exception handlers installed\n");
 }

@@ -197,11 +197,12 @@ LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 DRIVER_DIR := drivers
 
 # Search paths for source files
-vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/drivers kernel/platform $(DRIVER_DIR) \
+vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/drivers kernel/platform apps $(DRIVER_DIR) \
           $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng
 vpath %.S $(ARCH_DIR)
 
 C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(ARCH_DIR)/platform.c
+C_SOURCES += apps/app_illegal_instruction.c
 C_SOURCES += kernel/drivers/drivers.c
 C_SOURCES += $(DRIVER_DIR)/virtio_net/virtio_net.c
 C_SOURCES += $(DRIVER_DIR)/virtio_blk/virtio_blk.c

@@ -3,6 +3,7 @@
 #include "drivers/drivers.h"
 #include "devices/devices.h"
 #include "drivers_config.c"
+#include "init_apps.c"
 
 [[noreturn]] void kernel_main(uintptr_t boot_param) {
 
@@ -26,6 +27,9 @@
         puts("(none)");
     }
     puts("\n\n");
+
+    // Initialize applications based on command line
+    init_apps(cmdline);
 
     // Register drivers
     drivers_config_register();
