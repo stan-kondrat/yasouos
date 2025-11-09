@@ -44,7 +44,6 @@ qemu-system-aarch64 \
     -machine virt \
     -cpu cortex-a53 \
     -m 128M \
-    -semihosting-config enable=on,target=native \
     -kernel build/arm64/kernel.elf \
     -device virtio-rng-device \
     -nographic --no-reboot

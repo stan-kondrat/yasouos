@@ -54,7 +54,6 @@ sudo qemu-system-aarch64 \
     -machine virt \
     -cpu cortex-a53 \
     -m 128M \
-    -semihosting-config enable=on,target=native \
     -kernel build/arm64/kernel.elf \
     -netdev vmnet-bridged,id=net0,ifname=en0 \
     -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 \
