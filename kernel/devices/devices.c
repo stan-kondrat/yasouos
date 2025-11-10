@@ -1,5 +1,5 @@
 #include "devices.h"
-#include "../drivers/drivers.h"
+#include "../../common/drivers.h"
 #include "../../common/common.h"
 
 // Device registry (linked list)
@@ -115,14 +115,14 @@ device_t* devices_get_next(device_t *current) {
     return current->next;
 }
 
-device_driver_t* device_get_driver(device_t *device) {
+driver_t* device_get_driver(device_t *device) {
     if (!device) {
         return NULL;
     }
     return device->driver;
 }
 
-void device_set_driver(device_t *device, device_driver_t *driver) {
+void device_set_driver(device_t *device, driver_t *driver) {
     if (device) {
         device->driver = driver;
     }

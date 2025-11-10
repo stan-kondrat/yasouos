@@ -1,9 +1,8 @@
 #include "common.h"
 #include "platform/platform.h"
-#include "drivers/drivers.h"
 #include "devices/devices.h"
+#include "resources/resources.h"
 #include "init_apps.c"
-#include "init_drivers.c"
 
 [[noreturn]] void kernel_main(uintptr_t boot_param) {
 
@@ -28,20 +27,17 @@
     }
     puts("\n\n");
 
-    // Initialize applications based on command line
-    init_apps(cmdline);
-
-    // Register drivers
-    init_drivers();
-
     // Scan device tree and print
     device_set_fdt(boot_param);
     devices_scan();
     device_tree_print();
 
-    // Initialize devices with registered drivers
+    // Initialize resource manager with device list
+    resources_set_devices(devices_get_first());
+
+    // Initialize applications based on command line
     puts("\n");
-    drivers_init_devices();
+    init_apps(cmdline);
 
     puts("\nSystem halted.\n");
 

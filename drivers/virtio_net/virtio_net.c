@@ -1,7 +1,9 @@
 #include "virtio_net.h"
 
-// Global device instance (simplified for single device)
-static virtio_net_device_t global_device;
+// VirtIO Vendor and Device IDs
+#define VIRTIO_VENDOR_ID           0x1AF4
+#define VIRTIO_NET_DEVICE_ID_LEGACY 0x1000
+#define VIRTIO_NET_DEVICE_ID_MODERN 0x1041
 
 // Device ID table for matching
 static const device_id_t virtio_net_id_table[] = {
@@ -10,60 +12,25 @@ static const device_id_t virtio_net_id_table[] = {
     { 0, 0, 0, 0 } // Terminator
 };
 
-// Lifecycle hooks (for future dynamic loading)
-static int virtio_net_init(void) {
-    // Called once when driver is registered
-    // Future: Initialize driver-wide resources
+// Lifecycle hooks
+static int virtio_net_init_context(void *ctx, device_t *device) {
+    // TODO: Initialize VirtIO network device context
+    (void)ctx;
+    (void)device;
     return 0;
 }
 
-static void virtio_net_exit(void) {
-    // Called when driver is unregistered
-    // Future: Clean up driver-wide resources
+static void virtio_net_deinit_context(void *ctx) {
+    // TODO: Deinitialize VirtIO network device context
+    (void)ctx;
 }
-
-// Driver operations
-static void virtio_net_remove([[maybe_unused]] const device_t *device) {
-    global_device.initialized = 0;
-}
-
-static const driver_ops_t virtio_net_ops = {
-    .probe = virtio_net_probe,
-    .remove = virtio_net_remove,
-    .name = "virtio-net"
-};
 
 // Driver descriptor
-static const device_driver_t virtio_net_driver = {
+static const driver_t virtio_net_driver __attribute__((unused)) = {
     .name = "virtio-net",
     .version = "0.1.0",
     .type = DRIVER_TYPE_NETWORK,
     .id_table = virtio_net_id_table,
-    .ops = &virtio_net_ops,
-    .init = virtio_net_init,
-    .exit = virtio_net_exit
+    .init_context = virtio_net_init_context,
+    .deinit_context = virtio_net_deinit_context
 };
-
-driver_reg_result_t virtio_net_register_driver(void) {
-    return driver_register(&virtio_net_driver);
-}
-
-int virtio_net_probe(const device_t *device) {
-    if (!device) {
-        return -1;
-    }
-
-    global_device.device = *device;
-    global_device.io_base = device->reg_base;
-    global_device.initialized = 1;
-
-    return 0;
-}
-
-uint64_t virtio_net_get_io_base(const virtio_net_device_t *device) {
-    if (!device || !device->initialized) {
-        return 0;
-    }
-
-    return device->io_base;
-}

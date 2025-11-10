@@ -1,11 +1,13 @@
 // init_apps.c - Application initialization based on kernel command line
 #include "../common/common.h"
+#include "../apps/random/random.h"
 
 // Application prototypes
 extern void app_illegal_instruction(void);
 
 // Forward declarations
 static const char* find_param(const char* cmdline, const char* param);
+static const char* find_next_param(const char* start, const char* param);
 static int param_has_value(const char* param_pos, const char* value);
 
 void init_apps(const char* cmdline) {
@@ -13,11 +15,46 @@ void init_apps(const char* cmdline) {
         return;
     }
 
-    // Check for app=illegal-instruction
+    // Process all app= parameters in order
     const char* app_param = find_param(cmdline, "app");
-    if (app_param != NULL && param_has_value(app_param, "illegal-instruction")) {
-        app_illegal_instruction();
-        // Should never return
+    while (app_param != NULL) {
+        // Check for app=illegal-instruction
+        if (param_has_value(app_param, "illegal-instruction")) {
+            app_illegal_instruction();
+            // Should never return
+        }
+
+        // Check for app=random-software
+        if (param_has_value(app_param, "random-software")) {
+            uint8_t buffer[8];
+            int result = random_get_bytes(buffer, sizeof(buffer));
+            if (result > 0) {
+                puts("Random (software): ");
+                for (int i = 0; i < result; i++) {
+                    put_hex8(buffer[i]);
+                    puts(" ");
+                }
+                puts("\n");
+            }
+        }
+
+        // Check for app=random-hardware
+        if (param_has_value(app_param, "random-hardware")) {
+            random_hardware_init();
+            uint8_t buffer[8];
+            int result = random_get_bytes(buffer, sizeof(buffer));
+            if (result > 0) {
+                puts("Random (hardware): ");
+                for (int i = 0; i < result; i++) {
+                    put_hex8(buffer[i]);
+                    puts(" ");
+                }
+                puts("\n");
+            }
+        }
+
+        // Find next app= parameter
+        app_param = find_next_param(app_param, "app");
     }
 }
 
@@ -52,6 +89,21 @@ static const char* find_param(const char* cmdline, const char* param) {
     }
 
     return NULL;
+}
+
+// Helper function to find next occurrence of a parameter after given position
+static const char* find_next_param(const char* start, const char* param) {
+    if (start == NULL || param == NULL) {
+        return NULL;
+    }
+
+    // Move past the current parameter
+    while (*start != '\0' && *start != ' ' && *start != '\t') {
+        start++;
+    }
+
+    // Find next occurrence
+    return find_param(start, param);
 }
 
 // Helper function to check if a parameter has a specific value

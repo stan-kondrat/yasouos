@@ -3,11 +3,29 @@
 #include "../../common/types.h"
 #include "devices.h"
 
-// VirtIO MMIO registers
-#define VIRTIO_MMIO_MAGIC_VALUE      0x000
-#define VIRTIO_MMIO_VERSION          0x004
-#define VIRTIO_MMIO_DEVICE_ID        0x008
-#define VIRTIO_MMIO_VENDOR_ID        0x00c
+// VirtIO MMIO registers (Legacy/v1)
+#define VIRTIO_MMIO_MAGIC_VALUE           0x000
+#define VIRTIO_MMIO_VERSION               0x004
+#define VIRTIO_MMIO_DEVICE_ID             0x008
+#define VIRTIO_MMIO_VENDOR_ID             0x00c
+#define VIRTIO_MMIO_DEVICE_FEATURES       0x010
+#define VIRTIO_MMIO_DRIVER_FEATURES       0x020
+#define VIRTIO_MMIO_QUEUE_SEL             0x030
+#define VIRTIO_MMIO_QUEUE_NUM_MAX         0x034
+#define VIRTIO_MMIO_QUEUE_NUM             0x038
+#define VIRTIO_MMIO_QUEUE_ALIGN           0x03c
+#define VIRTIO_MMIO_QUEUE_PFN             0x040
+#define VIRTIO_MMIO_QUEUE_NOTIFY          0x050
+#define VIRTIO_MMIO_INTERRUPT_STATUS      0x060
+#define VIRTIO_MMIO_INTERRUPT_ACK         0x064
+#define VIRTIO_MMIO_STATUS                0x070
+
+// VirtIO status bits
+#define VIRTIO_STATUS_ACKNOWLEDGE         1
+#define VIRTIO_STATUS_DRIVER              2
+#define VIRTIO_STATUS_DRIVER_OK           4
+#define VIRTIO_STATUS_FEATURES_OK         8
+#define VIRTIO_STATUS_FAILED              128
 
 // VirtIO device types (not PCI IDs!)
 #define VIRTIO_TYPE_NET     1
@@ -48,6 +66,20 @@ static inline int mmio_read32_safe(uint64_t addr, uint32_t *value) {
 
     *value = *(volatile uint32_t *)(uintptr_t)addr;
     return 0;
+}
+
+/**
+ * Safe MMIO write with address validation
+ */
+static inline void mmio_write32(uint64_t addr, uint32_t value) {
+    *(volatile uint32_t *)(uintptr_t)addr = value;
+}
+
+/**
+ * MMIO read32 (no error checking for performance)
+ */
+static inline uint32_t mmio_read32(uint64_t addr) {
+    return *(volatile uint32_t *)(uintptr_t)addr;
 }
 
 /**

@@ -1,30 +1,73 @@
 #pragma once
 
 #include "../../common/types.h"
-#include "../../kernel/drivers/drivers.h"
+#include "../../common/drivers.h"
 #include "../../kernel/devices/devices.h"
+#include "../../kernel/resources/resources.h"
 
-// VirtIO Vendor and Device IDs
-#define VIRTIO_VENDOR_ID           0x1AF4
-#define VIRTIO_RNG_DEVICE_ID       0x1005
+// VirtIO RNG queue size
+#define VIRTIO_RNG_QUEUE_SIZE 8
 
-// VirtIO RNG Device Structure
+// Virtqueue descriptor
 typedef struct {
-    device_t device;
+    uint64_t addr;
+    uint32_t len;
+    uint16_t flags;
+    uint16_t next;
+} virtio_rng_desc_t;
+
+// Virtqueue available ring
+typedef struct {
+    uint16_t flags;
+    uint16_t idx;
+    uint16_t ring[VIRTIO_RNG_QUEUE_SIZE];
+} virtio_rng_avail_t;
+
+// Virtqueue used ring element
+typedef struct {
+    uint32_t id;
+    uint32_t len;
+} virtio_rng_used_elem_t;
+
+// Virtqueue used ring
+typedef struct {
+    uint16_t flags;
+    uint16_t idx;
+    virtio_rng_used_elem_t ring[VIRTIO_RNG_QUEUE_SIZE];
+} virtio_rng_used_t;
+
+// Virtqueue structure
+typedef struct {
+    virtio_rng_desc_t desc[VIRTIO_RNG_QUEUE_SIZE];
+    virtio_rng_avail_t avail;
+    uint8_t padding[4096];
+    virtio_rng_used_t used;
+    uint16_t last_used_idx;
+} virtio_rng_queue_t;
+
+/**
+ * VirtIO RNG context (user-allocated)
+ * Allocate on stack: virtio_rng_t rng = {0};
+ */
+typedef struct {
     uint64_t io_base;
-    int initialized;
-} virtio_rng_device_t;
+    bool initialized;
+    virtio_rng_queue_t queue;
+    uint8_t buffer[64];
+} virtio_rng_t;
 
 /**
- * Register virtio-rng driver with the system
- * @return driver_reg_result_t status code
+ * Get virtio-rng driver descriptor
+ * @return Pointer to driver descriptor
  */
-driver_reg_result_t virtio_rng_register_driver(void);
+const driver_t* virtio_rng_get_driver(void);
 
 /**
- * Probe function called by driver registry
+ * Read random bytes from hardware RNG
  *
- * @param device Device tree device to probe
- * @return 0 on success, -1 on failure
+ * @param ctx Initialized context
+ * @param buffer Buffer to fill with random data
+ * @param size Number of bytes to read
+ * @return Number of bytes read, or -1 on error
  */
-int virtio_rng_probe(const device_t *device);
+int virtio_rng_read(virtio_rng_t *ctx, uint8_t *buffer, size_t size);

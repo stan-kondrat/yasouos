@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../common/types.h"
-#include "../../kernel/drivers/drivers.h"
+#include "../../common/drivers.h"
 #include "../../kernel/devices/devices.h"
 
 // VirtIO Vendor and Device IDs
@@ -16,15 +16,7 @@ typedef struct {
 } virtio_blk_device_t;
 
 /**
- * Register virtio-blk driver with the system
- * @return driver_reg_result_t status code
+ * Get virtio-blk driver descriptor
+ * @return Pointer to driver descriptor
  */
-driver_reg_result_t virtio_blk_register_driver(void);
-
-/**
- * Probe function called by driver registry
- *
- * @param device Device tree device to probe
- * @return 0 on success, -1 on failure
- */
-int virtio_blk_probe(const device_t *device);
+const driver_t* virtio_blk_get_driver(void);

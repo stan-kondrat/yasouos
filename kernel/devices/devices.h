@@ -4,7 +4,7 @@
 
 // Forward declarations
 typedef struct device device_t;
-typedef struct device_driver device_driver_t;
+typedef struct driver driver_t;
 
 // Device lifecycle states
 typedef enum {
@@ -26,9 +26,10 @@ struct device {
     uint8_t device_num;         // PCI device number (if applicable)
     uint8_t function;           // PCI function number (if applicable)
 
-    device_driver_t *driver;    // Associated driver (set during probe)
+    driver_t *driver;    // Associated driver (set during probe)
     device_state_t state;       // Current device state
     void *mmio_virt;            // Virtual address of mapped MMIO region
+    void *driver_data;          // Driver-specific context (set during probe)
 
     // Device tree hierarchy
     device_t *parent;           // Parent device in tree
@@ -90,14 +91,14 @@ device_t* devices_get_next(device_t *current);
  * @param device Device to query
  * @return Pointer to driver, or NULL if no driver bound
  */
-device_driver_t* device_get_driver(device_t *device);
+driver_t* device_get_driver(device_t *device);
 
 /**
  * Set driver for a device (called during probe)
  * @param device Device to update
  * @param driver Driver to associate
  */
-void device_set_driver(device_t *device, device_driver_t *driver);
+void device_set_driver(device_t *device, driver_t *driver);
 
 /**
  * Map device MMIO region to virtual address space

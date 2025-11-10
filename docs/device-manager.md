@@ -9,9 +9,9 @@ Central coordinator for all devices and drivers.
 - Bus enumeration (FDT, PCI)
 - VirtIO MMIO detection with hardware probing
 - Device registry (linked list + tree hierarchy)
-- Driver registration with versioning
+- Resource manager for exclusive device allocation
 - Device-driver matching (compatible strings, vendor/device IDs)
-- Probe/remove lifecycle
+- Per-instance driver contexts (user-allocated)
 - Device state tracking (DISCOVERED → BOUND → ACTIVE → REMOVED)
 - MMIO mapping (identity mapping)
 
@@ -55,20 +55,41 @@ Central coordinator for all devices and drivers.
 
 ## Boot Sequence
 
-1. Device Manager init (registry, driver table)
-2. Bus enumeration (PCI, FDT)
-3. Driver binding (`drivers_probe_all()`)
-4. Hotplug monitoring (future)
+1. Device Manager init (registry)
+2. Bus enumeration (PCI, FDT) → devices **DISCOVERED**
+3. Resource manager init with device list
+4. Applications acquire resources via `resource_acquire_available()`
+5. Driver `init_context()` called → device **BOUND** and **ACTIVE**
+6. Hotplug monitoring (future)
 
 ## Device Lifecycle
 
 **State Transitions:**
 1. `devices_scan()` → **DISCOVERED**
-2. `drivers_probe_all()` → **BOUND**
-3. `driver->ops->probe()` → **ACTIVE** (future)
-4. `device_remove()` → **REMOVED** (future)
+2. `resource_acquire_available()` → **BOUND** (calls `driver->init_context()`)
+3. `driver->init_context()` → **ACTIVE**
+4. `resource_release()` → **REMOVED** (calls `driver->deinit_context()`, future)
 
 See [kernel/devices/devices.h](../kernel/devices/devices.h) for `device_state_t`.
+
+## Resource Manager
+
+**Location:** [kernel/resources/resources.c](../kernel/resources/resources.c)
+
+The resource manager provides exclusive device allocation:
+
+- `resources_set_devices()` - Initialize with device list from `devices_scan()`
+- `resource_acquire_available()` - Acquire first available device for driver
+- `resource_release()` - Release device resource
+- Calls driver `init_context()` on acquisition
+- Calls driver `deinit_context()` on release
+- Static resource pool (16 allocations max)
+
+**Driver Architecture:**
+- User-allocated contexts (e.g., `virtio_rng_t` on stack)
+- Driver provides `init_context()`/`deinit_context()` hooks
+- Resource manager handles device-driver lifecycle
+- Applications call `resource_acquire_available(driver, &context)` to initialize
 
 ## Device Tree Structure
 
