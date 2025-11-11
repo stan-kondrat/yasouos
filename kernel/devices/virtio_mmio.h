@@ -10,6 +10,7 @@
 #define VIRTIO_MMIO_VENDOR_ID             0x00c
 #define VIRTIO_MMIO_DEVICE_FEATURES       0x010
 #define VIRTIO_MMIO_DRIVER_FEATURES       0x020
+#define VIRTIO_MMIO_GUEST_PAGE_SIZE       0x028  // Legacy only (version 1)
 #define VIRTIO_MMIO_QUEUE_SEL             0x030
 #define VIRTIO_MMIO_QUEUE_NUM_MAX         0x034
 #define VIRTIO_MMIO_QUEUE_NUM             0x038
@@ -19,6 +20,16 @@
 #define VIRTIO_MMIO_INTERRUPT_STATUS      0x060
 #define VIRTIO_MMIO_INTERRUPT_ACK         0x064
 #define VIRTIO_MMIO_STATUS                0x070
+
+// VirtIO-PCI legacy I/O space register offsets (different from MMIO!)
+#define VIRTIO_PCI_DEVICE_FEATURES        0x00
+#define VIRTIO_PCI_DRIVER_FEATURES        0x04
+#define VIRTIO_PCI_QUEUE_PFN              0x08
+#define VIRTIO_PCI_QUEUE_NUM              0x0C
+#define VIRTIO_PCI_QUEUE_SEL              0x0E
+#define VIRTIO_PCI_QUEUE_NOTIFY           0x10
+#define VIRTIO_PCI_STATUS                 0x12
+#define VIRTIO_PCI_ISR_STATUS             0x13
 
 // VirtIO status bits
 #define VIRTIO_STATUS_ACKNOWLEDGE         1
@@ -81,6 +92,50 @@ static inline void mmio_write32(uint64_t addr, uint32_t value) {
 static inline uint32_t mmio_read32(uint64_t addr) {
     return *(volatile uint32_t *)(uintptr_t)addr;
 }
+
+// VirtIO-PCI I/O port operations (for AMD64)
+#if defined(__x86_64__) || defined(__i386__)
+
+static inline void io_outb(uint16_t port, uint8_t value) {
+    __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static inline void io_outw(uint16_t port, uint16_t value) {
+    __asm__ volatile ("outw %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static inline void io_outl(uint16_t port, uint32_t value) {
+    __asm__ volatile ("outl %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static inline uint8_t io_inb(uint16_t port) {
+    uint8_t result;
+    __asm__ volatile ("inb %1, %0" : "=a"(result) : "Nd"(port));
+    return result;
+}
+
+static inline uint16_t io_inw(uint16_t port) {
+    uint16_t result;
+    __asm__ volatile ("inw %1, %0" : "=a"(result) : "Nd"(port));
+    return result;
+}
+
+static inline uint32_t io_inl(uint16_t port) {
+    uint32_t result;
+    __asm__ volatile ("inl %1, %0" : "=a"(result) : "Nd"(port));
+    return result;
+}
+
+// VirtIO-PCI uses I/O ports for register access
+static inline uint32_t virtio_pci_read32(uint16_t iobase, uint16_t offset) {
+    return io_inl(iobase + offset);
+}
+
+static inline void virtio_pci_write32(uint16_t iobase, uint16_t offset, uint32_t value) {
+    io_outl(iobase + offset, value);
+}
+
+#endif
 
 /**
  * Probe a single VirtIO MMIO device and populate vendor/device IDs

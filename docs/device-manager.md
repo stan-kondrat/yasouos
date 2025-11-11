@@ -6,7 +6,10 @@ Central coordinator for all devices and drivers.
 
 **Implemented:**
 - Full FDT parsing (RISC-V/ARM64)
-- Bus enumeration (FDT, PCI)
+- Bus enumeration (FDT, PCIe ECAM, Legacy PCI)
+- PCIe ECAM support (ARM64/RISC-V with auto-detection)
+- Legacy PCI I/O port support (AMD64)
+- BAR size probing for all PCI devices
 - VirtIO MMIO detection with hardware probing
 - Device registry (linked list + tree hierarchy)
 - Resource manager for exclusive device allocation
@@ -27,13 +30,23 @@ Central coordinator for all devices and drivers.
 | Method | Architecture | Implementation |
 |--------|-------------|----------------|
 | MMIO | All | Identity mapping via `device_map_mmio()` |
-| PCIe ECAM | AMD64 | Config space at 0xB0000000 |
-| Platform Devices (FDT) | RISC-V, ARM64, AMD64 | FDT parser |
+| PCIe ECAM | ARM64, RISC-V | Memory-mapped config space (auto-detected) |
+| Legacy PCI I/O | AMD64 | I/O ports 0xCF8/0xCFC |
+| Platform Devices (FDT) | RISC-V, ARM64 | FDT parser |
+
+**PCI Configuration Access:**
+- **ARM64/RISC-V**: PCIe ECAM only (`-M virt` in QEMU)
+  - ARM64: ECAM at 0x4010000000
+  - RISC-V: ECAM at 0x30000000
+- **AMD64**: Machine type dependent
+  - `-M pc`: Legacy I/O ports (0xCF8/0xCFC) - Configuration Address/Data Method
+  - `-M q35`: MMCONFIG/ECAM available at 0xB0000000 (currently disabled, uses legacy)
 
 **Limitations:**
 - MMIO uses identity mapping (physical == virtual)
 - PCI scans first 2 buses, function 0 only
 - No hotplug (static discovery at boot)
+- AMD64 ECAM disabled (requires page table setup for safe access)
 
 ## Bus Enumerators
 
@@ -45,13 +58,26 @@ Central coordinator for all devices and drivers.
 - VirtIO detection: reads magic (0x74726976) and device type from MMIO registers
 - Reports only devices with attached hardware
 
-### PCIe ECAM (AMD64)
+### PCIe ECAM (ARM64/RISC-V)
+**Locations:**
+- [kernel/devices/devices_arm64.c](../kernel/devices/devices_arm64.c)
+- [kernel/devices/devices_riscv.c](../kernel/devices/devices_riscv.c)
+
+- Auto-detects ECAM by probing base address for valid vendor ID
+- Memory-mapped configuration space access (no I/O ports needed)
+- Reads vendor/device IDs and BARs via MMIO
+- Probes BAR sizes using write-read-restore method
+- Scans first 2 PCI buses (sufficient for QEMU `-M virt`)
+- Also enumerates FDT devices (combined enumeration)
+
+### Legacy PCI (AMD64)
 **Location:** [kernel/devices/devices_amd64.c](../kernel/devices/devices_amd64.c)
 
-- Scans PCIe config space via ECAM at 0xB0000000
-- Reads vendor/device IDs and BARs
-- Scans bus 0 only (sufficient for QEMU)
-- Falls back to FDT if available
+- Uses legacy I/O port method (0xCF8 = address, 0xCFC = data)
+- Reads vendor/device IDs and BARs via I/O instructions
+- Probes BAR sizes using write-read-restore method
+- Scans first 2 PCI buses (sufficient for QEMU)
+- ECAM infrastructure present but disabled (memory access requires paging setup)
 
 ## Boot Sequence
 

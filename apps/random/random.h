@@ -5,8 +5,10 @@
 /**
  * Initialize hardware RNG (optional)
  * Acquires exclusive access to hardware RNG device via resource manager.
+ *
+ * @return 0 on success (hardware acquired), -1 on failure (no hardware available)
  */
-void random_hardware_init(void);
+int random_hardware_init(void);
 
 /**
  * Get random bytes

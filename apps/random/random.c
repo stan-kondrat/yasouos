@@ -8,14 +8,20 @@
 // Random Module State
 // ============================================================================
 
+#define MAX_HARDWARE_RNG_DEVICES 4
+
 static struct {
-    virtio_rng_t rng_context;       // Hardware RNG context (stack-allocated)
-    bool initialized;                // Module initialized
-    bool has_hardware;               // Hardware RNG available
+    virtio_rng_t rng_contexts[MAX_HARDWARE_RNG_DEVICES];  // Hardware RNG contexts
+    resource_t *resources[MAX_HARDWARE_RNG_DEVICES];      // Associated resources
+    int device_count;                                      // Number of acquired devices
+    int next_device_index;                                 // Round-robin index for device selection
+    bool initialized;                                      // Module initialized
 } random_state = {
-    .rng_context = {0},
-    .initialized = false,
-    .has_hardware = false
+    .rng_contexts = {{0}},
+    .resources = {NULL},
+    .device_count = 0,
+    .next_device_index = 0,
+    .initialized = false
 };
 
 // ============================================================================
@@ -109,23 +115,30 @@ static int hardware_read_bytes(virtio_rng_t *ctx,
 // Public API Implementation
 // ============================================================================
 
-void random_hardware_init(void) {
-    if (random_state.has_hardware) {
-        return;  // Already initialized
+int random_hardware_init(void) {
+    // Check if we can acquire more devices
+    if (random_state.device_count >= MAX_HARDWARE_RNG_DEVICES) {
+        puts("Initializing hardware RNG...\n");
+        puts("  Maximum hardware RNG devices already acquired\n");
+        return -1;
     }
 
     puts("Initializing hardware RNG...\n");
 
-    // Get driver descriptor and acquire resource
+    // Get driver descriptor and acquire next available resource
     // Resource manager calls init_context automatically
     const driver_t *driver = virtio_rng_get_driver();
-    resource_t *resource = resource_acquire_available(driver, &random_state.rng_context);
+    int device_idx = random_state.device_count;
+    resource_t *resource = resource_acquire_available(driver, &random_state.rng_contexts[device_idx]);
 
     if (resource) {
-        random_state.has_hardware = true;
+        random_state.resources[device_idx] = resource;
+        random_state.device_count++;
         puts("  Hardware RNG acquired (virtio-rng)\n");
+        return 0;
     } else {
         puts("  Hardware RNG unavailable, using software PRNG (xorshift64)\n");
+        return -1;
     }
 }
 
@@ -140,15 +153,15 @@ int random_get_bytes(uint8_t *buffer, size_t length) {
         random_state.initialized = true;
     }
 
-    // Use hardware if available, otherwise software fallback
-    if (random_state.has_hardware) {
-        return hardware_read_bytes(&random_state.rng_context, buffer, length);
+    // Use hardware if available (round-robin across devices), otherwise software fallback
+    if (random_state.device_count > 0) {
+        // Select device using round-robin
+        int device_idx = random_state.next_device_index;
+        random_state.next_device_index = (random_state.next_device_index + 1) % random_state.device_count;
+
+        return hardware_read_bytes(&random_state.rng_contexts[device_idx], buffer, length);
     } else {
         prng_fill_bytes(buffer, length);
         return (int)length;
     }
-}
-
-bool random_has_hardware(void) {
-    return random_state.has_hardware;
 }

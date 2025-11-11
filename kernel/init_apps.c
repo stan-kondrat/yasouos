@@ -40,11 +40,15 @@ void init_apps(const char* cmdline) {
 
         // Check for app=random-hardware
         if (param_has_value(app_param, "random-hardware")) {
-            random_hardware_init();
+            int hw_result = random_hardware_init();
             uint8_t buffer[8];
             int result = random_get_bytes(buffer, sizeof(buffer));
             if (result > 0) {
-                puts("Random (hardware): ");
+                if (hw_result == 0) {
+                    puts("Random (hardware): ");
+                } else {
+                    puts("Random (software): ");
+                }
                 for (int i = 0; i < result; i++) {
                     put_hex8(buffer[i]);
                     puts(" ");
