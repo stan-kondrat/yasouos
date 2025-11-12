@@ -201,3 +201,22 @@ device_t* resource_get_device(resource_t *resource) {
     }
     return resource->device;
 }
+
+void resource_print_tag(const resource_t *resource) {
+    if (!resource || !resource->driver || !resource->device) {
+        return;
+    }
+
+    const driver_t *driver = resource->driver;
+    const device_t *device = resource->device;
+
+    puts("[");
+    put_hex8(device->bus);
+    puts(":");
+    put_hex8(device->device_num);
+    puts("|");
+    puts(driver->name);
+    puts("@");
+    puts(driver->version);
+    puts("]");
+}

@@ -203,7 +203,7 @@ DRIVER_DIR := drivers
 
 # Search paths for source files
 vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel/resources apps apps/random $(DRIVER_DIR) \
-          $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng
+          $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng $(DRIVER_DIR)/e1000 $(DRIVER_DIR)/rtl8139
 vpath %.S $(ARCH_DIR)
 
 C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(ARCH_DIR)/platform.c
@@ -213,6 +213,8 @@ C_SOURCES += kernel/resources/resources.c
 C_SOURCES += $(DRIVER_DIR)/virtio_net/virtio_net.c
 C_SOURCES += $(DRIVER_DIR)/virtio_blk/virtio_blk.c
 C_SOURCES += $(DRIVER_DIR)/virtio_rng/virtio_rng.c
+C_SOURCES += $(DRIVER_DIR)/e1000/e1000.c
+C_SOURCES += $(DRIVER_DIR)/rtl8139/rtl8139.c
 
 # Device tree implementation (common + architecture-specific)
 C_SOURCES += kernel/devices/devices.c

@@ -48,3 +48,10 @@ int resource_release(resource_t *resource);
  * @return Device pointer, or NULL if invalid resource
  */
 device_t* resource_get_device(resource_t *resource);
+
+/**
+ * Print device tag in format [bus:device|driver@version]
+ *
+ * @param resource Resource handle
+ */
+void resource_print_tag(const resource_t *resource);

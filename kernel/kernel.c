@@ -30,6 +30,8 @@
     // Scan device tree and print
     device_set_fdt(boot_param);
     devices_scan();
+    
+    puts("\n\n");
     device_tree_print();
 
     // Initialize resource manager with device list
