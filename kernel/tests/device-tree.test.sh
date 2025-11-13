@@ -1,24 +1,33 @@
 #!/bin/bash
 
 # Test device tree enumeration and printing
-# Usage: ./tests/device-tree.sh [-v] [arch]
+# Usage: ./kernel/tests/device-tree.test.sh [-v] [arch] [boot_type]
 #   -v: verbose mode (prints QEMU output)
 #   arch: riscv|arm64|amd64 (if not specified, runs all)
+#   boot_type: kernel|image (only kernel is tested, image is ignored)
 #
 # Examples:
-#   ./tests/device-tree.sh              # Run all architectures
-#   ./tests/device-tree.sh -v           # Run all with verbose output
-#   ./tests/device-tree.sh arm64        # Run ARM64 only
-#   ./tests/device-tree.sh -v riscv     # Run RISC-V with verbose output
+#   ./kernel/tests/device-tree.test.sh              # Run all architectures
+#   ./kernel/tests/device-tree.test.sh -v           # Run all with verbose output
+#   ./kernel/tests/device-tree.test.sh arm64        # Run ARM64 only
+#   ./kernel/tests/device-tree.test.sh -v riscv     # Run RISC-V with verbose output
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/_common.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/tests/common.sh"
 
 # Parse verbose flag
 eval "$(parse_verbose_flag "$@")"
 
 # Parse architectures to test
 ARCHS=$(parse_arch "$1")
+BOOT_TYPE_FILTER="$2"
+
+# Only test kernel boot (skip if filter is "image")
+if [ "$BOOT_TYPE_FILTER" = "image" ]; then
+    echo "Skipping device tree tests (only kernel boot supported)"
+    exit 0
+fi
 
 TIMEOUT=3
 

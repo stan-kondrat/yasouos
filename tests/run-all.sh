@@ -1,9 +1,13 @@
 #!/bin/bash
 
 # Run all YasouOS tests
-# Usage: ./tests/_run-all.sh [-v] [arch]
+# Usage: ./tests/run-all.sh [-v] [arch] [boot_type]
+#   -v: verbose mode
+#   arch: riscv|arm64|amd64 (if not specified, runs all)
+#   boot_type: kernel|image (if not specified, runs both)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Color codes
 COLOR_RESET='\033[0m'
@@ -11,15 +15,11 @@ COLOR_GREEN='\033[0;32m'
 COLOR_RED='\033[0;31m'
 COLOR_BOLD='\033[1m'
 
-# Discover all test scripts (excluding _common.sh and _run-all.sh)
+# Discover all *.test.sh files recursively in the project
 test_scripts=()
-for script in "$SCRIPT_DIR"/*.sh; do
-    basename=$(basename "$script")
-    # Skip utility files that start with underscore
-    if [[ ! "$basename" =~ ^_ ]]; then
-        test_scripts+=("$script")
-    fi
-done
+while IFS= read -r -d '' script; do
+    test_scripts+=("$script")
+done < <(find "$PROJECT_ROOT" -type f -name "*.test.sh" -print0)
 
 # Sort test scripts for consistent execution order
 IFS=$'\n' test_scripts=($(sort <<<"${test_scripts[*]}"))

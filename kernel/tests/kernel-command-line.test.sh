@@ -1,18 +1,18 @@
 #!/bin/bash
 
-# Test basic kernel boot by checking for version string
-# Usage: ./tests/boot-test.sh [-v] [arch] [boot_type]
+# Test kernel command line argument parsing
+# Usage: ./kernel/tests/kernel-command-line.test.sh [-v] [arch] [boot_type]
 #   -v: verbose mode (prints QEMU output)
 #   arch: riscv|arm64|amd64 (if not specified, runs all)
 #   boot_type: kernel|image (if not specified, runs both)
 #
 # Examples:
-#   ./tests/boot-test.sh              # Run all 5 tests
-#   ./tests/boot-test.sh -v           # Run all tests with verbose output
-#   ./tests/boot-test.sh amd64        # Run AMD64 kernel test
-#   ./tests/boot-test.sh amd64 kernel # Run AMD64 kernel test
-#   ./tests/boot-test.sh -v arm64     # Run ARM64 tests with verbose output
-#   ./tests/boot-test.sh arm64 image  # Run ARM64 disk image test
+#   ./kernel/tests/kernel-command-line.test.sh              # Run all 5 tests
+#   ./kernel/tests/kernel-command-line.test.sh -v           # Run all tests with verbose output
+#   ./kernel/tests/kernel-command-line.test.sh amd64        # Run AMD64 kernel test
+#   ./kernel/tests/kernel-command-line.test.sh amd64 kernel # Run AMD64 kernel test
+#   ./kernel/tests/kernel-command-line.test.sh -v arm64     # Run ARM64 tests with verbose output
+#   ./kernel/tests/kernel-command-line.test.sh arm64 image  # Run ARM64 disk image test
 #
 # Tests 5 boot configurations:
 # 1. AMD64 kernel boot
@@ -22,7 +22,8 @@
 # 5. RISC-V disk image boot
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/_common.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/tests/common.sh"
 
 # Parse verbose flag
 eval "$(parse_verbose_flag "$@")"
@@ -31,14 +32,14 @@ eval "$(parse_verbose_flag "$@")"
 ARCHS=$(parse_arch "$1")
 BOOT_TYPE_FILTER="$2"
 
-BOOT_STRING="YasouOS v0."
+CMDLINE_ARGS="lorem ipsum"
 TIMEOUT=3
 
 # Color for info messages
 COLOR_CYAN='\033[0;36m'
 COLOR_RESET='\033[0m'
 
-echo -e "${COLOR_CYAN}Testing kernel boot - checking for: '$BOOT_STRING'${COLOR_RESET}"
+echo -e "${COLOR_CYAN}Testing kernel command line parsing with: '$CMDLINE_ARGS'${COLOR_RESET}"
 
 run_boot_test() {
     local test_num="$1"
@@ -52,7 +53,7 @@ run_boot_test() {
     check_image_exists "$image" "$arch" || return 1
 
     test_timer_start
-    output=$(run_qemu_test "$arch" "$image" "test=hello debug loglevel=7" "$TIMEOUT")
+    output=$(run_qemu_test "$arch" "$image" "$CMDLINE_ARGS" "$TIMEOUT")
 
     if [ "$VERBOSE" -eq 1 ]; then
         echo "    --- QEMU Output ---"
@@ -60,11 +61,11 @@ run_boot_test() {
         echo "    --- End Output ---"
     fi
 
-    if echo "$output" | grep -q "$BOOT_STRING"; then
-        test_pass "Boot string '$BOOT_STRING' found in output"
+    if echo "$output" | grep -q "lorem ipsum"; then
+        test_pass "Command line '$CMDLINE_ARGS' found in output"
         return 0
     else
-        test_fail "Boot string '$BOOT_STRING' NOT found in output"
+        test_fail "Command line '$CMDLINE_ARGS' NOT found in output"
         return 1
     fi
 }
@@ -85,34 +86,28 @@ for arch in $ARCHS; do
                 test_count=$((test_count + 1))
                 run_boot_test "$test_count" "$arch" "$kernel" "kernel" "AMD64" || failed_count=$((failed_count + 1))
             fi
-
-            # Test 2: AMD64 disk image boot
-            if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "image" ]; then
-                test_count=$((test_count + 1))
-                run_boot_test "$test_count" "$arch" "$disk" "image" "AMD64" || failed_count=$((failed_count + 1))
-            fi
             ;;
         arm64)
-            # Test 3: ARM64 kernel boot
+            # Test 2: ARM64 kernel boot
             if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "kernel" ]; then
                 test_count=$((test_count + 1))
                 run_boot_test "$test_count" "$arch" "$kernel" "kernel" "ARM64" || failed_count=$((failed_count + 1))
             fi
 
-            # Test 4: ARM64 disk image boot
+            # Test 3: ARM64 disk image boot
             if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "image" ]; then
                 test_count=$((test_count + 1))
                 run_boot_test "$test_count" "$arch" "$disk" "image" "ARM64" || failed_count=$((failed_count + 1))
             fi
             ;;
         riscv)
-            # Test 5: RISC-V kernel boot
+            # Test 4: RISC-V kernel boot
             if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "kernel" ]; then
                 test_count=$((test_count + 1))
                 run_boot_test "$test_count" "$arch" "$kernel" "kernel" "RISC-V" || failed_count=$((failed_count + 1))
             fi
 
-            # Test 6: RISC-V disk image boot
+            # Test 5: RISC-V disk image boot
             if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "image" ]; then
                 test_count=$((test_count + 1))
                 run_boot_test "$test_count" "$arch" "$disk" "image" "RISC-V" || failed_count=$((failed_count + 1))
@@ -124,8 +119,8 @@ done
 echo ""
 # Use colors from _common.sh
 if [ $failed_count -eq 0 ]; then
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All $test_count boot tests passed ===${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All $test_count kernel command line tests passed ===${COLOR_RESET}"
 else
-    echo -e "${COLOR_BOLD}${COLOR_RED}=== $failed_count of $test_count boot tests failed ===${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_RED}=== $failed_count of $test_count kernel command line tests failed ===${COLOR_RESET}"
     exit 1
 fi

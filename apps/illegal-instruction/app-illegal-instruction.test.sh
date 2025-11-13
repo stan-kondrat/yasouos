@@ -1,24 +1,33 @@
 #!/bin/bash
 
 # Test illegal instruction exception handling
-# Usage: ./tests/app_illegal_instruction.sh [-v] [arch]
+# Usage: ./apps/illegal-instruction/app-illegal-instruction.test.sh [-v] [arch] [boot_type]
 #   -v: verbose mode (prints QEMU output)
 #   arch: riscv|arm64|amd64 (if not specified, runs all)
+#   boot_type: kernel|image (only kernel is tested, image is ignored)
 #
 # Examples:
-#   ./tests/app_illegal_instruction.sh              # Run all tests
-#   ./tests/app_illegal_instruction.sh -v           # Run all tests with verbose output
-#   ./tests/app_illegal_instruction.sh amd64        # Run AMD64 test only
-#   ./tests/app_illegal_instruction.sh -v arm64     # Run ARM64 test with verbose output
+#   ./apps/illegal-instruction/app-illegal-instruction.test.sh              # Run all tests
+#   ./apps/illegal-instruction/app-illegal-instruction.test.sh -v           # Run all tests with verbose output
+#   ./apps/illegal-instruction/app-illegal-instruction.test.sh amd64        # Run AMD64 test only
+#   ./apps/illegal-instruction/app-illegal-instruction.test.sh -v arm64     # Run ARM64 test with verbose output
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/_common.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/tests/common.sh"
 
 # Parse verbose flag
 eval "$(parse_verbose_flag "$@")"
 
 # Parse architectures to test
 ARCHS=$(parse_arch "$1")
+BOOT_TYPE_FILTER="$2"
+
+# Only test kernel boot (skip if filter is "image")
+if [ "$BOOT_TYPE_FILTER" = "image" ]; then
+    echo "Skipping illegal instruction tests (only kernel boot supported)"
+    exit 0
+fi
 
 CMDLINE_ARGS="app=illegal-instruction"
 TIMEOUT=3

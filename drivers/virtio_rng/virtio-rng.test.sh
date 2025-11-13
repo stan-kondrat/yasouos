@@ -1,28 +1,37 @@
 #!/bin/bash
 
 # Test VirtIO RNG driver with hardware devices and software fallback
-# Usage: ./tests/virtio-rng.sh [-v] [arch]
+# Usage: ./drivers/virtio_rng/virtio-rng.test.sh [-v] [arch] [boot_type]
 #   -v: verbose mode (prints QEMU output)
 #   arch: riscv|arm64|amd64 (if not specified, runs all)
+#   boot_type: kernel|image (only kernel is tested, image is ignored)
 #
 # Examples:
-#   ./tests/virtio-rng.sh              # Run all 8 tests
-#   ./tests/virtio-rng.sh -v           # Run all tests with verbose output
-#   ./tests/virtio-rng.sh amd64        # Run AMD64 tests (both pc and q35)
-#   ./tests/virtio-rng.sh -v arm64     # Run ARM64 tests with verbose output
+#   ./drivers/virtio_rng/virtio-rng.test.sh              # Run all 8 tests
+#   ./drivers/virtio_rng/virtio-rng.test.sh -v           # Run all tests with verbose output
+#   ./drivers/virtio_rng/virtio-rng.test.sh amd64        # Run AMD64 tests (both pc and q35)
+#   ./drivers/virtio_rng/virtio-rng.test.sh -v arm64     # Run ARM64 tests with verbose output
 #
 # Tests 8 configurations:
 # 1-4: Hardware RNG with two devices (ARM64, RISC-V, AMD64-pc, AMD64-q35)
 # 5-8: Software fallback with one devices (ARM64, RISC-V, AMD64-pc, AMD64-q35)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/_common.sh"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+source "$PROJECT_ROOT/tests/common.sh"
 
 # Parse verbose flag
 eval "$(parse_verbose_flag "$@")"
 
 # Parse architectures to test
 ARCHS=$(parse_arch "$1")
+BOOT_TYPE_FILTER="$2"
+
+# Only test kernel boot (skip if filter is "image")
+if [ "$BOOT_TYPE_FILTER" = "image" ]; then
+    echo "Skipping VirtIO RNG tests (only kernel boot supported)"
+    exit 0
+fi
 
 TIMEOUT=5
 

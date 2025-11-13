@@ -202,12 +202,12 @@ LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 DRIVER_DIR := drivers
 
 # Search paths for source files
-vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel/resources apps apps/random $(DRIVER_DIR) \
+vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel/resources apps apps/illegal-instruction apps/random $(DRIVER_DIR) \
           $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng $(DRIVER_DIR)/e1000 $(DRIVER_DIR)/rtl8139
 vpath %.S $(ARCH_DIR)
 
 C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(ARCH_DIR)/platform.c
-C_SOURCES += apps/app_illegal_instruction.c
+C_SOURCES += apps/illegal-instruction/app_illegal_instruction.c
 C_SOURCES += apps/random/random.c
 C_SOURCES += kernel/resources/resources.c
 C_SOURCES += $(DRIVER_DIR)/virtio_net/virtio_net.c
@@ -346,7 +346,7 @@ else
 endif
 
 _do_test: $(KERNEL_ELF) $(DISK_IMG)
-	@./tests/_run-all.sh $(ARCH)
+	@./tests/run-all.sh $(ARCH)
 
 _do_check_deps:
 	@echo "$(BLUE)Checking $(ARCH) dependencies...$(NC)"
