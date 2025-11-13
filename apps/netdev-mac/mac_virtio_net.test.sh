@@ -1,15 +1,15 @@
 #!/bin/bash
 
 
-# Test virtio-net driver MAC address reading
-# Usage: ./drivers/virtio_net/virtio_net.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
+# Test virtio-net MAC address reading
+# Usage: ./apps/netdev-mac/mac_virtio_net.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
 #
 # Examples:
-#   ./drivers/virtio_net/virtio_net.test.sh              # Run all architectures
-#   ./drivers/virtio_net/virtio_net.test.sh -v           # Run all with verbose output
-#   ./drivers/virtio_net/virtio_net.test.sh arm64        # Run ARM64 only
-#   ./drivers/virtio_net/virtio_net.test.sh -v riscv     # Run RISC-V with verbose output
-#   ./drivers/virtio_net/virtio_net.test.sh -v amd64 image
+#   ./apps/netdev-mac/mac_virtio_net.test.sh              # Run all architectures
+#   ./apps/netdev-mac/mac_virtio_net.test.sh -v           # Run all with verbose output
+#   ./apps/netdev-mac/mac_virtio_net.test.sh arm64        # Run ARM64 only
+#   ./apps/netdev-mac/mac_virtio_net.test.sh -v riscv     # Run RISC-V with verbose output
+#   ./apps/netdev-mac/mac_virtio_net.test.sh -v amd64 image
 
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

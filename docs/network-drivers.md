@@ -1,11 +1,22 @@
+# Network Drivers
 
-- ARM64 (virtio-net + e1000) (-device virtio-net-device)
-- RISC-V (virtio-net + e1000) (-device virtio-net-device)
-- x86_64 PC (virtio-net + rtl8139) (-device virtio-net-pci)
-- x86_64 Q35 (virtio-net + rtl8139) (-device virtio-net-pci)
+## Supported Devices
 
+- **ARM64**: virtio-net
+  - virtio-net: `-device virtio-net-device`
 
-"app=mac-virtio-net"
+- **RISC-V**: virtio-net, e1000
+  - virtio-net: `-device virtio-net-device`
+  - e1000: `-device e1000` (PCI)
 
-[00:01|virtio-net@0.1.0] Initializing...
-[00:01|virtio-net@0.1.0] MAC: 52:54:00:12:34:56
+- **AMD64 (x86_64)**: virtio-net, rtl8139
+  - virtio-net: `-device virtio-net-pci`
+  - rtl8139: `-device rtl8139` (PCI)
+
+## Applications
+
+Print MAC addresses:
+- `app=mac-virtio-net` - VirtIO-Net devices only
+- `app=mac-e1000` - E1000 devices only (RISC-V)
+- `app=mac-rtl8139` - RTL8139 devices only (AMD64)
+- `app=mac-all` - All available network devices

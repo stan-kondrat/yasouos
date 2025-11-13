@@ -17,13 +17,15 @@ Run on AWS EC2 and return "Hello World" on HTTP port
 
 ## Supported Drivers
 
-YasouOS includes support for the following PCI devices:
+YasouOS includes support for the following devices:
 
-| Driver | Vendor ID | Device ID | Name | Status |
-|--------|-----------|-----------|------|--------|
-| **virtio-net** | 0x1af4 | 0x1000 | VirtIO Network| ✅ Working |
-| **virtio-blk** | 0x1af4 | 0x1001 | VirtIO Block Device | 🚧 Stub |
-| **virtio-rng** | 0x1af4 | 0x1005 | VirtIO RNG (Entropy Source) | 🚧 Stub |
+| Driver | Vendor ID | Device ID | Arch Support | Status |
+|--------|-----------|-----------|--------------|--------|
+| **virtio-net** | 0x1af4 | 0x1000 | All | ✅ Working |
+| **virtio-rng** | 0x1af4 | 0x1005 | All | ✅ Working |
+| **e1000** | 0x8086 | 0x100e | RISC-V | ✅ Working |
+| **rtl8139** | 0x10ec | 0x8139 | AMD64 | ✅ Working |
+| **virtio-blk** | 0x1af4 | 0x1001 | All | 🚧 Stub |
 
 
 ## Technical Stack
@@ -101,6 +103,7 @@ The build system automatically detects available cross-compilers:
 ## Documentation
 
 - [Kernel Command Line Arguments](docs/kernel-command-line.md) - Examples for RISC-V, ARM64, and AMD64
+- [Network Drivers](docs/network-drivers.md) - Supported network devices and applications
 
 ## Thanks
 - Inspired by https://github.com/nuta/operating-system-in-1000-lines

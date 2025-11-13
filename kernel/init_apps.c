@@ -1,6 +1,7 @@
 // init_apps.c - Application initialization based on kernel command line
 #include "../common/common.h"
 #include "../apps/random/random.h"
+#include "../apps/netdev-mac/netdev_mac.h"
 #include "../drivers/virtio_net/virtio_net.h"
 #include "../drivers/e1000/e1000.h"
 #include "../drivers/rtl8139/rtl8139.h"
@@ -8,19 +9,6 @@
 
 // Application prototypes
 extern void app_illegal_instruction(void);
-
-// VirtIO-Net device contexts (supports up to 4 network devices)
-#define MAX_NET_DEVICES 4
-static virtio_net_t virtio_net_contexts[MAX_NET_DEVICES] = {0};
-static int virtio_net_device_count = 0;
-
-// E1000 device contexts (supports up to 4 network devices)
-static e1000_t e1000_contexts[MAX_NET_DEVICES] = {0};
-static int e1000_device_count = 0;
-
-// RTL8139 device contexts (supports up to 4 network devices)
-static rtl8139_t rtl8139_contexts[MAX_NET_DEVICES] = {0};
-static int rtl8139_device_count = 0;
 
 // Forward declarations
 static const char* find_param(const char* cmdline, const char* param);
@@ -76,122 +64,22 @@ void init_apps(const char* cmdline) {
 
         // Check for app=mac-virtio-net
         if (param_has_value(app_param, "mac-virtio-net")) {
-            if (virtio_net_device_count >= MAX_NET_DEVICES) {
-                puts("virtio-net: Maximum number of devices reached\n");
-            } else {
-                const driver_t *driver = virtio_net_get_driver();
-                resource_t *resource = resource_acquire_available(driver, &virtio_net_contexts[virtio_net_device_count]);
-
-                if (resource != NULL) {
-                    resource_print_tag(resource);
-                    puts(" Initializing...\n");
-
-                    resource_print_tag(resource);
-                    puts(" MAC: ");
-
-                    uint8_t mac[6];
-                    int result = virtio_net_get_mac(&virtio_net_contexts[virtio_net_device_count], mac);
-                    if (result == 0) {
-                        for (int i = 0; i < 6; i++) {
-                            put_hex8(mac[i]);
-                            if (i < 5) {
-                                puts(":");
-                            }
-                        }
-                    } else {
-                        puts("(unavailable)");
-                    }
-                    puts("\n");
-
-                    virtio_net_device_count++;
-                } else {
-                    puts("virtio-net: No available device\n");
-                }
-            }
+            app_mac_virtio_net();
         }
 
         // Check for app=mac-e1000
         if (param_has_value(app_param, "mac-e1000")) {
-            if (e1000_device_count >= MAX_NET_DEVICES) {
-                puts("e1000: Maximum number of devices reached\n");
-            } else {
-                const driver_t *driver = e1000_get_driver();
-                if (!driver) {
-                    puts("e1000: Failed to get driver\n");
-                    app_param = find_next_param(app_param, "app");
-                    continue;
-                }
-
-                resource_t *resource = resource_acquire_available(driver, &e1000_contexts[e1000_device_count]);
-
-                if (resource != NULL) {
-                    resource_print_tag(resource);
-                    puts(" Initializing...\n");
-
-                    resource_print_tag(resource);
-                    puts(" MAC: ");
-
-                    uint8_t mac[6];
-                    int result = e1000_get_mac(&e1000_contexts[e1000_device_count], mac);
-                    if (result == 0) {
-                        for (int i = 0; i < 6; i++) {
-                            put_hex8(mac[i]);
-                            if (i < 5) {
-                                puts(":");
-                            }
-                        }
-                    } else {
-                        puts("(unavailable)");
-                    }
-                    puts("\n");
-
-                    e1000_device_count++;
-                } else {
-                    puts("e1000: No available device\n");
-                }
-            }
+            app_mac_e1000();
         }
 
         // Check for app=mac-rtl8139
         if (param_has_value(app_param, "mac-rtl8139")) {
-            if (rtl8139_device_count >= MAX_NET_DEVICES) {
-                puts("rtl8139: Maximum number of devices reached\n");
-            } else {
-                const driver_t *driver = rtl8139_get_driver();
-                if (!driver) {
-                    puts("rtl8139: Failed to get driver\n");
-                    app_param = find_next_param(app_param, "app");
-                    continue;
-                }
+            app_mac_rtl8139();
+        }
 
-                resource_t *resource = resource_acquire_available(driver, &rtl8139_contexts[rtl8139_device_count]);
-
-                if (resource != NULL) {
-                    resource_print_tag(resource);
-                    puts(" Initializing...\n");
-
-                    resource_print_tag(resource);
-                    puts(" MAC: ");
-
-                    uint8_t mac[6];
-                    int result = rtl8139_get_mac(&rtl8139_contexts[rtl8139_device_count], mac);
-                    if (result == 0) {
-                        for (int i = 0; i < 6; i++) {
-                            put_hex8(mac[i]);
-                            if (i < 5) {
-                                puts(":");
-                            }
-                        }
-                    } else {
-                        puts("(unavailable)");
-                    }
-                    puts("\n");
-
-                    rtl8139_device_count++;
-                } else {
-                    puts("rtl8139: No available device\n");
-                }
-            }
+        // Check for app=mac-all
+        if (param_has_value(app_param, "mac-all")) {
+            app_mac_all();
         }
 
         // Find next app= parameter

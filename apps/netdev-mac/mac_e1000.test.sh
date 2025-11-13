@@ -1,15 +1,15 @@
 #!/bin/bash
 
 
-# Test e1000 driver MAC address reading
-# Usage: ./drivers/e1000/e1000.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
+# Test e1000 MAC address reading
+# Usage: ./apps/netdev-mac/mac_e1000.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
 #
 # Examples:
-#   ./drivers/e1000/e1000.test.sh              # Run all architectures
-#   ./drivers/e1000/e1000.test.sh -v           # Run all with verbose output
-#   ./drivers/e1000/e1000.test.sh arm64        # Run ARM64 only
-#   ./drivers/e1000/e1000.test.sh -v riscv     # Run RISC-V with verbose output
-#   ./drivers/e1000/e1000.test.sh -v amd64 image
+#   ./apps/netdev-mac/mac_e1000.test.sh              # Run all architectures
+#   ./apps/netdev-mac/mac_e1000.test.sh -v           # Run all with verbose output
+#   ./apps/netdev-mac/mac_e1000.test.sh arm64        # Run ARM64 only
+#   ./apps/netdev-mac/mac_e1000.test.sh -v riscv     # Run RISC-V with verbose output
+#   ./apps/netdev-mac/mac_e1000.test.sh -v amd64 image
 
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

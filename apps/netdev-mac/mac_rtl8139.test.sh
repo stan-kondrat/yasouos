@@ -1,15 +1,15 @@
 #!/bin/bash
 
 
-# Test RTL8139 driver MAC address reading
-# Usage: ./drivers/rtl8139/rtl8139.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
+# Test RTL8139 MAC address reading
+# Usage: ./apps/netdev-mac/mac_rtl8139.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
 #
 # Examples:
-#   ./drivers/rtl8139/rtl8139.test.sh              # Run all architectures
-#   ./drivers/rtl8139/rtl8139.test.sh -v           # Run all with verbose output
-#   ./drivers/rtl8139/rtl8139.test.sh arm64        # Run ARM64 only
-#   ./drivers/rtl8139/rtl8139.test.sh -v riscv     # Run RISC-V with verbose output
-#   ./drivers/rtl8139/rtl8139.test.sh -v amd64 image
+#   ./apps/netdev-mac/mac_rtl8139.test.sh              # Run all architectures
+#   ./apps/netdev-mac/mac_rtl8139.test.sh -v           # Run all with verbose output
+#   ./apps/netdev-mac/mac_rtl8139.test.sh arm64        # Run ARM64 only
+#   ./apps/netdev-mac/mac_rtl8139.test.sh -v riscv     # Run RISC-V with verbose output
+#   ./apps/netdev-mac/mac_rtl8139.test.sh -v amd64 image
 
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
