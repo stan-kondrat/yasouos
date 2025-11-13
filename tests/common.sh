@@ -1,14 +1,11 @@
 #!/bin/bash
 
-# Common test utilities for YasouOS tests
-
-set -e
+# Common test utilities for YasouOS tests - Matrix-based API
 
 # Parse verbose flag and detect CI environment
 # Usage: eval "$(parse_verbose_flag "$@")"
 # Outputs: VERBOSE=1 and optional shift command
 parse_verbose_flag() {
-    # Auto-enable in CI environments
     if [ -n "$CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
         if [ "$1" = "-v" ]; then
             echo "VERBOSE=1; shift"
@@ -128,93 +125,6 @@ get_disk_path() {
     esac
 }
 
-# Run QEMU with timeout and capture output
-run_qemu_test() {
-    local arch="$1"
-    local image="$2"
-    local append_args="$3"
-    local timeout_val="${4:-3}"
-
-    local qemu_cmd
-    qemu_cmd=$(get_qemu_cmd "$arch")
-
-    local machine_flags
-    machine_flags=$(get_qemu_machine_flags "$arch")
-
-    # Create temporary file for output
-    local tmpfile=$(mktemp)
-
-    # Build command array for proper quoting
-    local -a cmd=(
-        "${qemu_cmd}"
-    )
-
-    # Add machine flags (word splitting intentional here)
-    for flag in ${machine_flags}; do
-        cmd+=("${flag}")
-    done
-
-    # Check if this is a disk image or kernel
-    if [[ "$image" == *.img ]]; then
-        # Disk image boot - only AMD64 has bootloader support
-        if [ "$arch" = "amd64" ]; then
-            cmd+=(
-                -drive "file=${image},format=raw"
-                -nographic
-                --no-reboot
-            )
-        else
-            # For RISC-V and ARM64, disk images need kernel flag (no bootloader yet)
-            cmd+=(
-                -kernel "${image}"
-                -append "${append_args}"
-                -nographic
-                --no-reboot
-            )
-        fi
-    else
-        # Kernel boot
-        cmd+=(
-            -kernel "${image}"
-            -append "${append_args}"
-            -nographic
-            --no-reboot
-        )
-    fi
-
-    # Execute with timeout using background process
-    "${cmd[@]}" > "${tmpfile}" 2>&1 &
-    local qemu_pid=$!
-
-    # Wait for process with timeout (in deciseconds, 10 deciseconds = 1 second)
-    local count=0
-    local max_count=$((timeout_val * 10))
-    while kill -0 "$qemu_pid" 2>/dev/null && [ $count -lt $max_count ]; do
-        sleep 0.1
-        count=$((count + 1))
-    done
-
-    # Kill process if still running
-    if kill -0 "$qemu_pid" 2>/dev/null; then
-        kill -TERM "$qemu_pid" 2>/dev/null || true
-        sleep 0.2
-        kill -KILL "$qemu_pid" 2>/dev/null || true
-    fi
-
-    # Wait for process to terminate
-    wait "$qemu_pid" 2>/dev/null || true
-
-    # Read the output from temp file and strip ANSI/control sequences
-    # Remove ESC sequences and control chars, preserving newlines and tabs
-    sed 's/\x1b\[[0-9;?]*[mGKHJABCDsuhl]//g' "${tmpfile}" | \
-    sed 's/\x1b[()][0AB]//g' | \
-    sed 's/\x1b[=>]//g' | \
-    tr -d '\000-\010\013\014\016-\037\177'
-
-    # Clean up
-    rm -f "${tmpfile}"
-}
-
 # Color codes
 COLOR_RESET='\033[0m'
 COLOR_GREEN='\033[0;32m'
@@ -228,7 +138,6 @@ COLOR_GRAY='\033[0;90m'
 TEST_START_TIME=0
 
 get_timestamp_ms() {
-    # Use GNU date on Linux, gdate on macOS if available, otherwise seconds
     if command -v gdate >/dev/null 2>&1; then
         gdate +%s%3N
     elif date +%s%3N 2>/dev/null | grep -q '^[0-9]\+$'; then
@@ -260,32 +169,221 @@ format_time() {
     fi
 }
 
-# Test result helpers
-test_pass() {
-    local elapsed=$(test_timer_stop)
-    local time_str=$(format_time $elapsed)
-    echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} $1 ${COLOR_GRAY}(${time_str})${COLOR_RESET}"
-}
-
-test_fail() {
-    local elapsed=$(test_timer_stop)
-    local time_str=$(format_time $elapsed)
-    echo -e "  ${COLOR_RED}✗${COLOR_RESET} $1 ${COLOR_GRAY}(${time_str})${COLOR_RESET}"
-}
+TEST_SECTION_COUNT=0
 
 test_section() {
+    TEST_SECTION_COUNT=$((TEST_SECTION_COUNT + 1))
     echo ""
-    echo -e "${COLOR_BOLD}${COLOR_BLUE}=== $1 ===${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_BLUE}=== Test $TEST_SECTION_COUNT: $1 ===${COLOR_RESET}"
 }
 
-# Check if image file exists
-check_image_exists() {
-    local image="$1"
-    local arch="$2"
+# Test matrix framework variables
+TEST_MATRIX_ARCH=""
+TEST_MATRIX_BOOT_TYPE=""
+TEST_MATRIX_VERBOSE=0
+TEST_MATRIX_TEST_COUNT=0
+TEST_MATRIX_FAILED_COUNT=0
+TEST_MATRIX_TIMEOUT=5
+COLOR_CYAN='\033[0;36m'
 
-    if [ ! -f "$image" ]; then
-        test_fail "$image not found (run 'make ARCH=$arch' first)"
+# Initialize test matrix framework
+# Usage: init_test_matrix "$@" ["optional custom message"]
+# Parses command line arguments for verbose flag, architecture, and boot type
+# Optionally displays a custom message before parsing
+init_test_matrix() {
+    local message=""
+    local args=("$@")
+
+    # Check if last argument is a message (not a flag or arch/boot_type)
+    local last_arg="${args[${#args[@]}-1]}"
+    if [ "${#args[@]}" -gt 0 ] && [ "$last_arg" != "-v" ] && \
+       [ "$last_arg" != "kernel" ] && [ "$last_arg" != "image" ] && \
+       [ "$last_arg" != "riscv" ] && [ "$last_arg" != "arm64" ] && [ "$last_arg" != "amd64" ]; then
+        message="$last_arg"
+        unset 'args[${#args[@]}-1]'
+    fi
+
+    eval "$(parse_verbose_flag "${args[@]}")"
+    TEST_MATRIX_VERBOSE=$VERBOSE
+
+    # Remove -v flag from args array if present
+    if [ "${args[0]}" = "-v" ]; then
+        args=("${args[@]:1}")
+    fi
+
+    local arch_arg="${args[0]}"
+    local boot_type_arg="${args[1]}"
+
+    # Display custom message if provided
+    if [ -n "$message" ]; then
+        echo -e "${COLOR_CYAN}${message}${COLOR_RESET}"
+    fi
+
+    # Parse architecture (default: all architectures)
+    if [ -z "$arch_arg" ]; then
+        TEST_MATRIX_ARCH="amd64 arm64 riscv"
+    else
+        TEST_MATRIX_ARCH=$(parse_arch "$arch_arg")
+    fi
+
+    # Parse boot type (default: both kernel and image)
+    if [ -z "$boot_type_arg" ]; then
+        TEST_MATRIX_BOOT_TYPE="kernel image"
+    elif [ "$boot_type_arg" = "kernel" ] || [ "$boot_type_arg" = "image" ]; then
+        TEST_MATRIX_BOOT_TYPE="$boot_type_arg"
+    else
+        TEST_MATRIX_BOOT_TYPE="kernel image"
+    fi
+}
+
+# Build full QEMU command with machine flags, kernel/image, and common flags
+# Usage: get_full_qemu_cmd <arch> <boot_type>
+# Returns: Complete QEMU command string ready to execute
+get_full_qemu_cmd() {
+    local arch="$1"
+    local boot_type="$2"
+
+    local qemu_binary
+    qemu_binary=$(get_qemu_cmd "$arch")
+
+    local machine_flags
+    machine_flags=$(get_qemu_machine_flags "$arch")
+
+    if [ "$boot_type" = "image" ]; then
+        local disk
+        disk=$(get_disk_path "$arch")
+        if [ "$arch" = "amd64" ]; then
+            echo "$qemu_binary $machine_flags -drive file=$disk,format=raw -nographic --no-reboot"
+        else
+            # For RISC-V and ARM64, disk images need kernel flag (no bootloader yet)
+            echo "$qemu_binary $machine_flags -kernel $disk -nographic --no-reboot"
+        fi
+    else
+        local kernel
+        kernel=$(get_kernel_path "$arch")
+        echo "$qemu_binary $machine_flags -kernel $kernel -nographic --no-reboot"
+    fi
+}
+
+# Run single test case and return output
+# Usage: output=$(run_test_case "<qemu_command>" [timeout])
+# The function prints test metadata to stderr and returns test output to stdout
+run_test_case() {
+    local full_qemu_command="$1"
+    local timeout="${2:-$TEST_MATRIX_TIMEOUT}"
+
+    test_timer_start
+
+    local tmpfile
+    tmpfile=$(mktemp)
+
+    bash -c "$full_qemu_command" > "${tmpfile}" 2>&1 &
+    local qemu_pid=$!
+
+    # Wait for QEMU with timeout (in 100ms intervals)
+    local count=0
+    local max_count=$((timeout * 10))
+    while kill -0 "$qemu_pid" 2>/dev/null && [ $count -lt $max_count ]; do
+        sleep 0.1
+        count=$((count + 1))
+    done
+
+    # Kill QEMU if still running
+    if kill -0 "$qemu_pid" 2>/dev/null; then
+        kill -TERM "$qemu_pid" 2>/dev/null || true
+        sleep 0.2
+        kill -KILL "$qemu_pid" 2>/dev/null || true
+    fi
+
+    wait "$qemu_pid" 2>/dev/null || true
+
+    # Print execution time
+    local elapsed
+    elapsed=$(test_timer_stop)
+    local time_str
+    time_str=$(format_time "$elapsed")
+    echo -e "  ${COLOR_GRAY}Test execution time: ${time_str}${COLOR_RESET}" >&2
+
+    # Clean ANSI escape sequences from output
+    local output
+    output=$(sed 's/\x1b\[[0-9;?]*[mGKHJABCDsuhl]//g' "${tmpfile}" | \
+        sed 's/\x1b[()][0AB]//g' | \
+        sed 's/\x1b[=>]//g' | \
+        tr -d '\000-\010\013\014\016-\037\177')
+
+    rm -f "${tmpfile}"
+
+    # Print verbose output if enabled
+    if [ "$TEST_MATRIX_VERBOSE" -eq 1 ]; then
+        echo "  --- QEMU Output ---" >&2
+        echo "$output" | sed 's/^/  /' >&2
+        echo "  --- End Output ---" >&2
+    fi
+
+    echo "$output"
+}
+
+# Skip test case with a message
+# Usage: skip_test_case "reason for skipping"
+skip_test_case() {
+    local reason="$1"
+    echo -e "  ${COLOR_YELLOW}⊘${COLOR_RESET} $reason (skipping)"
+}
+
+# Assert string count in output
+# Usage: assert_count "$output" "pattern" expected_count "description"
+assert_count() {
+    local output="$1"
+    local search_pattern="$2"
+    local expected_count="$3"
+    local assert_desc="$4"
+
+    # Increment test count in parent shell (not in subshell from run_test_case)
+    TEST_MATRIX_TEST_COUNT=$((TEST_MATRIX_TEST_COUNT + 1))
+
+    local actual_count
+    actual_count=$(echo "$output" | grep -c "$search_pattern" || true)
+
+    if [ "$actual_count" -eq "$expected_count" ]; then
+        echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} $assert_desc (found $expected_count)"
+        return 0
+    else
+        echo -e "  ${COLOR_RED}✗${COLOR_RESET} $assert_desc (expected $expected_count, got $actual_count)"
+        TEST_MATRIX_FAILED_COUNT=$((TEST_MATRIX_FAILED_COUNT + 1))
         return 1
     fi
-    return 0
+}
+
+# Assert string exists in output (at least once, ignoring duplicates)
+# Usage: assert_contains "$output" "pattern" "description"
+assert_contains() {
+    local output="$1"
+    local search_pattern="$2"
+    local assert_desc="$3"
+
+    # Increment test count in parent shell (not in subshell from run_test_case)
+    TEST_MATRIX_TEST_COUNT=$((TEST_MATRIX_TEST_COUNT + 1))
+
+    if echo "$output" | grep -q "$search_pattern"; then
+        echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} $assert_desc"
+        return 0
+    else
+        echo -e "  ${COLOR_RED}✗${COLOR_RESET} $assert_desc (pattern not found)"
+        TEST_MATRIX_FAILED_COUNT=$((TEST_MATRIX_FAILED_COUNT + 1))
+        return 1
+    fi
+}
+
+# Finish test matrix and print results
+# Usage: finish_test_matrix "test suite name"
+finish_test_matrix() {
+    local test_name="$1"
+
+    echo ""
+    if [ "$TEST_MATRIX_FAILED_COUNT" -eq 0 ]; then
+        echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All $TEST_MATRIX_TEST_COUNT $test_name passed ===${COLOR_RESET}"
+    else
+        echo -e "${COLOR_BOLD}${COLOR_RED}=== $TEST_MATRIX_FAILED_COUNT of $TEST_MATRIX_TEST_COUNT $test_name failed ===${COLOR_RESET}"
+        exit 1
+    fi
 }

@@ -53,7 +53,8 @@ endef
 
 $(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),build)))
 $(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),test)))
-$(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),test-img)))
+$(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),test-kernel)))
+$(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),test-image)))
 $(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),run-img)))
 
 # Multi-architecture dispatch
@@ -73,7 +74,8 @@ endef
 
 $(eval $(call MULTI_ARCH_TARGET,build,Building,All architectures built!))
 $(eval $(call MULTI_ARCH_TARGET,test,Testing,All tests passed!))
-$(eval $(call MULTI_ARCH_TARGET,test-img,Testing disk images for,All disk image tests passed!))
+$(eval $(call MULTI_ARCH_TARGET,test-kernel,Testing kernels for,All kernel tests passed!))
+$(eval $(call MULTI_ARCH_TARGET,test-image,Testing disk images for,All disk image tests passed!))
 
 # Simple targets
 .PHONY: all clean help
@@ -95,13 +97,15 @@ help:
 	@echo "Usage: make [target] [ARCH=riscv|arm64|amd64]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all        - Build and test all architectures (default)"
-	@echo "  build      - Build kernel(s) and disk images"
-	@echo "  run        - Build and run in QEMU (requires ARCH)"
-	@echo "  run-img    - Run bootable disk image interactively (requires ARCH)"
-	@echo "  test       - Test kernel(s)"
-	@echo "  clean      - Remove build files"
-	@echo "  check-deps - Check build dependencies"
+	@echo "  all         - Build and test all architectures (default)"
+	@echo "  build       - Build kernel(s) and disk images"
+	@echo "  run         - Build and run in QEMU (requires ARCH)"
+	@echo "  run-img     - Run bootable disk image interactively (requires ARCH)"
+	@echo "  test        - Test kernel(s) and disk images"
+	@echo "  test-kernel - Test kernel(s)"
+	@echo "  test-image  - Test disk images"
+	@echo "  clean       - Remove build files"
+	@echo "  check-deps  - Check build dependencies"
 	@echo ""
 
 # Single-architecture targets
@@ -191,8 +195,12 @@ MAP := $(BUILD_DIR)/ld.map
 DISK_MAP := $(BUILD_DIR)/ld_disk.map
 
 # Compiler flags
+# NOTE: -fomit-frame-pointer is required because macOS GCC generates frame pointers (RBP-based stack frames)
+# by default, while Linux GCC does not. This causes different stack layouts between platforms, which breaks
+# kernel initialization during the boot process. This flag ensures consistent RSP-relative addressing across
+# all platforms, matching the Linux GCC default behavior.
 CFLAGS := -std=c23 -O3 -g3 -Wall -Wextra -ffreestanding -nostdlib -fno-builtin
-CFLAGS += -fno-stack-protector -fno-pic -fno-pie -I$(COMMON_DIR) $(ARCH_FLAGS)
+CFLAGS += -fno-stack-protector -fno-pic -fno-pie -fomit-frame-pointer -I$(COMMON_DIR) $(ARCH_FLAGS)
 CFLAGS += -DARCH_NAME=\"$(ARCH_NAME)\"
 
 # Linker flags
@@ -328,7 +336,7 @@ $(DISK_IMG): $(KERNEL_BIN)
 endif
 
 # Implementation targets
-.PHONY: _do_build _do_test _do_run _do_run-img _do_check_deps
+.PHONY: _do_build _do_test _do_test-kernel _do_test-image _do_run _do_run-img _do_check_deps
 _do_build: $(KERNEL_ELF) $(DISK_IMG)
 
 _do_run: $(KERNEL_ELF)
@@ -347,6 +355,12 @@ endif
 
 _do_test: $(KERNEL_ELF) $(DISK_IMG)
 	@./tests/run-all.sh $(ARCH)
+
+_do_test-kernel: $(KERNEL_ELF) $(DISK_IMG)
+	@./tests/run-all.sh $(ARCH) kernel
+
+_do_test-image: $(DISK_IMG)
+	@./tests/run-all.sh $(ARCH) image
 
 _do_check_deps:
 	@echo "$(BLUE)Checking $(ARCH) dependencies...$(NC)"

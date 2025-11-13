@@ -26,6 +26,7 @@ IFS=$'\n' test_scripts=($(sort <<<"${test_scripts[*]}"))
 unset IFS
 
 # Run each test script
+total_suites=0
 total_failures=0
 for script in "${test_scripts[@]}"; do
     echo -e "=============================="
@@ -33,15 +34,18 @@ for script in "${test_scripts[@]}"; do
     echo -e "=============================="
     "$script" "$@"
     result=$?
-    total_failures=$((total_failures + result))
+    total_suites=$((total_suites + 1))
+    if [ $result -ne 0 ]; then
+        total_failures=$((total_failures + 1))
+    fi
     echo ""
 done
 
 # Display overall result
 if [ $total_failures -eq 0 ]; then
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All test suites passed ===${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All $total_suites test suite(s) passed ===${COLOR_RESET}"
     exit 0
 else
-    echo -e "${COLOR_BOLD}${COLOR_RED}=== $total_failures test suite(s) failed ===${COLOR_RESET}"
+    echo -e "${COLOR_BOLD}${COLOR_RED}=== $total_failures of $total_suites test suite(s) failed ===${COLOR_RESET}"
     exit 1
 fi

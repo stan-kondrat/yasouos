@@ -88,7 +88,7 @@ __asm__(
     "    ld a0, 8(sp)\n"
     "    ld ra, 0(sp)\n"
     "    addi sp, sp, 16\n"
-    "    sret\n"
+    "1:  j 1b\n"  // Infinite loop instead of sret - trap_handler should never return
 );
 
 static void platform_setup_exception_handlers(void) {

@@ -169,13 +169,14 @@ jobs:
         retention-days: 1
 
   test:
-    name: Test ${{ matrix.arch }}
+    name: Test ${{ matrix.arch }} (${{ matrix.boot_type }})
     runs-on: ubuntu-24.04
     needs: [build-qemu, build-gcc]
     strategy:
       fail-fast: false
       matrix:
         arch: [riscv, arm64, amd64]
+        boot_type: [kernel, image]
         include:
           - arch: riscv
             qemu_arch: riscv64
@@ -246,19 +247,19 @@ jobs:
         fi
         make ARCH=${{ matrix.arch }} CC=$CC build
 
-    - name: Test YasouOS on ${{ matrix.arch }}
+    - name: Test YasouOS on ${{ matrix.arch }} (${{ matrix.boot_type }})
       run: |
-        echo "=== Testing ${{ matrix.arch }} with debug info ==="
+        echo "=== Testing ${{ matrix.arch }} (${{ matrix.boot_type }}) with debug info ==="
         echo "Using QEMU: $QEMU_BINARY"
         echo "Using GCC: $CC"
         $QEMU_BINARY --version | head -1
         $CC --version | head -1
         echo "=== Running test ==="
-        timeout 30s make ARCH=${{ matrix.arch }} CC=$CC QEMU=$QEMU_BINARY test
+        timeout 30s make ARCH=${{ matrix.arch }} CC=$CC QEMU=$QEMU_BINARY test-${{ matrix.boot_type }}
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
-      if: always()
+      if: always() && matrix.boot_type == 'kernel'
       with:
         name: yasouos-${{ matrix.arch }}-build
         path: |
@@ -269,7 +270,7 @@ jobs:
       uses: actions/upload-artifact@v4
       if: failure()
       with:
-        name: yasouos-${{ matrix.arch }}-test-logs
+        name: yasouos-${{ matrix.arch }}-${{ matrix.boot_type }}-test-logs
         path: |
           build/${{ matrix.arch }}/test-*.log
         retention-days: 7

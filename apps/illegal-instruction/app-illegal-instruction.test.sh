@@ -16,73 +16,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$PROJECT_ROOT/tests/common.sh"
 
-# Parse verbose flag
-eval "$(parse_verbose_flag "$@")"
+init_test_matrix "$@" "Testing illegal instruction exception with: 'app=illegal-instruction'"
 
-# Parse architectures to test
-ARCHS=$(parse_arch "$1")
-BOOT_TYPE_FILTER="$2"
+for arch in $TEST_MATRIX_ARCH; do
+    for boot_type in $TEST_MATRIX_BOOT_TYPE; do
+        test_section "illegal instruction exception ($arch $boot_type)"
 
-# Only test kernel boot (skip if filter is "image")
-if [ "$BOOT_TYPE_FILTER" = "image" ]; then
-    echo "Skipping illegal instruction tests (only kernel boot supported)"
-    exit 0
-fi
+        # AMD64 raw image doesn't support command line args (no bootloader yet)
+        if [ "$arch" = "amd64" ] && [ "$boot_type" = "image" ]; then
+            skip_test_case "AMD64 raw image doesn't support command line args"
+            continue
+        fi
 
-CMDLINE_ARGS="app=illegal-instruction"
-TIMEOUT=3
+        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
 
-# Color for info messages
-COLOR_CYAN='\033[0;36m'
-COLOR_RESET='\033[0m'
-
-echo -e "${COLOR_CYAN}Testing illegal instruction exception with: '$CMDLINE_ARGS'${COLOR_RESET}"
-
-run_exception_test() {
-    local test_num="$1"
-    local arch="$2"
-    local image="$3"
-    local desc="$4"
-
-    echo "  Test $test_num: $desc"
-
-    check_image_exists "$image" "$arch" || return 1
-
-    test_timer_start
-    output=$(run_qemu_test "$arch" "$image" "$CMDLINE_ARGS" "$TIMEOUT")
-
-    if [ "$VERBOSE" -eq 1 ]; then
-        echo "    --- QEMU Output ---"
-        echo "$output" | sed 's/^/    /'
-        echo "    --- End Output ---"
-    fi
-
-    if echo "$output" | grep -q "\[EXCEPTION\] Unknown/Illegal Instruction"; then
-        test_pass "Exception message found in output"
-        return 0
-    else
-        test_fail "Exception message NOT found in output"
-        return 1
-    fi
-}
-
-test_count=0
-failed_count=0
-
-for arch in $ARCHS; do
-    test_section "Testing $arch"
-
-    kernel=$(get_kernel_path "$arch")
-
-    test_count=$((test_count + 1))
-    run_exception_test "$test_count" "$arch" "$kernel" "$arch" || failed_count=$((failed_count + 1))
+        qemu_args=(
+            -append "'app=illegal-instruction'"
+        )
+        output=$(run_test_case "$qemu_cmd ${qemu_args[*]}")
+        assert_count "$output" "\\[EXCEPTION\\] Unknown/Illegal Instruction" 1 "Exception message found in output"
+    done
 done
 
-echo ""
-# Use colors from _common.sh
-if [ $failed_count -eq 0 ]; then
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All $test_count illegal instruction tests passed ===${COLOR_RESET}"
-else
-    echo -e "${COLOR_BOLD}${COLOR_RED}=== $failed_count of $test_count illegal instruction tests failed ===${COLOR_RESET}"
-    exit 1
-fi
+finish_test_matrix "illegal instruction tests"

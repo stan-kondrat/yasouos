@@ -7,120 +7,40 @@
 #   boot_type: kernel|image (if not specified, runs both)
 #
 # Examples:
-#   ./kernel/tests/kernel-command-line.test.sh              # Run all 5 tests
+#   ./kernel/tests/kernel-command-line.test.sh              # Run all tests
 #   ./kernel/tests/kernel-command-line.test.sh -v           # Run all tests with verbose output
-#   ./kernel/tests/kernel-command-line.test.sh amd64        # Run AMD64 kernel test
-#   ./kernel/tests/kernel-command-line.test.sh amd64 kernel # Run AMD64 kernel test
+#   ./kernel/tests/kernel-command-line.test.sh amd64        # Run AMD64 tests (kernel and image)
+#   ./kernel/tests/kernel-command-line.test.sh amd64 kernel # Run AMD64 kernel test only
 #   ./kernel/tests/kernel-command-line.test.sh -v arm64     # Run ARM64 tests with verbose output
 #   ./kernel/tests/kernel-command-line.test.sh arm64 image  # Run ARM64 disk image test
-#
-# Tests 5 boot configurations:
-# 1. AMD64 kernel boot
-# 2. ARM64 kernel boot
-# 3. ARM64 disk image boot
-# 4. RISC-V kernel boot
-# 5. RISC-V disk image boot
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$PROJECT_ROOT/tests/common.sh"
 
-# Parse verbose flag
-eval "$(parse_verbose_flag "$@")"
-
-# Parse architectures to test
-ARCHS=$(parse_arch "$1")
-BOOT_TYPE_FILTER="$2"
 
 CMDLINE_ARGS="lorem ipsum"
-TIMEOUT=3
 
-# Color for info messages
-COLOR_CYAN='\033[0;36m'
-COLOR_RESET='\033[0m'
+init_test_matrix "$@" "Testing kernel command line parsing with: '$CMDLINE_ARGS'"
 
-echo -e "${COLOR_CYAN}Testing kernel command line parsing with: '$CMDLINE_ARGS'${COLOR_RESET}"
+for arch in $TEST_MATRIX_ARCH; do
+    for boot_type in $TEST_MATRIX_BOOT_TYPE; do
+        test_section "kernel command line ($arch $boot_type)"
 
-run_boot_test() {
-    local test_num="$1"
-    local arch="$2"
-    local image="$3"
-    local boot_type="$4"
-    local desc="$5"
+        # AMD64 raw image doesn't support command line args (no bootloader yet)
+        if [ "$arch" = "amd64" ] && [ "$boot_type" = "image" ]; then
+            skip_test_case "AMD64 raw image doesn't support command line args"
+            continue
+        fi
 
-    echo "  Test $test_num: $desc ($boot_type)"
+        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
 
-    check_image_exists "$image" "$arch" || return 1
-
-    test_timer_start
-    output=$(run_qemu_test "$arch" "$image" "$CMDLINE_ARGS" "$TIMEOUT")
-
-    if [ "$VERBOSE" -eq 1 ]; then
-        echo "    --- QEMU Output ---"
-        echo "$output" | sed 's/^/    /'
-        echo "    --- End Output ---"
-    fi
-
-    if echo "$output" | grep -q "lorem ipsum"; then
-        test_pass "Command line '$CMDLINE_ARGS' found in output"
-        return 0
-    else
-        test_fail "Command line '$CMDLINE_ARGS' NOT found in output"
-        return 1
-    fi
-}
-
-test_count=0
-failed_count=0
-
-for arch in $ARCHS; do
-    test_section "Testing $arch"
-
-    kernel=$(get_kernel_path "$arch")
-    disk=$(get_disk_path "$arch")
-
-    case "$arch" in
-        amd64)
-            # Test 1: AMD64 kernel boot
-            if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "kernel" ]; then
-                test_count=$((test_count + 1))
-                run_boot_test "$test_count" "$arch" "$kernel" "kernel" "AMD64" || failed_count=$((failed_count + 1))
-            fi
-            ;;
-        arm64)
-            # Test 2: ARM64 kernel boot
-            if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "kernel" ]; then
-                test_count=$((test_count + 1))
-                run_boot_test "$test_count" "$arch" "$kernel" "kernel" "ARM64" || failed_count=$((failed_count + 1))
-            fi
-
-            # Test 3: ARM64 disk image boot
-            if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "image" ]; then
-                test_count=$((test_count + 1))
-                run_boot_test "$test_count" "$arch" "$disk" "image" "ARM64" || failed_count=$((failed_count + 1))
-            fi
-            ;;
-        riscv)
-            # Test 4: RISC-V kernel boot
-            if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "kernel" ]; then
-                test_count=$((test_count + 1))
-                run_boot_test "$test_count" "$arch" "$kernel" "kernel" "RISC-V" || failed_count=$((failed_count + 1))
-            fi
-
-            # Test 5: RISC-V disk image boot
-            if [ -z "$BOOT_TYPE_FILTER" ] || [ "$BOOT_TYPE_FILTER" = "image" ]; then
-                test_count=$((test_count + 1))
-                run_boot_test "$test_count" "$arch" "$disk" "image" "RISC-V" || failed_count=$((failed_count + 1))
-            fi
-            ;;
-    esac
+        qemu_args=(
+            -append "'$CMDLINE_ARGS'"
+        )
+        output=$(run_test_case "$qemu_cmd ${qemu_args[*]}")
+        assert_count "$output" "lorem ipsum" 1 "Command line '$CMDLINE_ARGS' found in output"
+    done
 done
 
-echo ""
-# Use colors from _common.sh
-if [ $failed_count -eq 0 ]; then
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All $test_count kernel command line tests passed ===${COLOR_RESET}"
-else
-    echo -e "${COLOR_BOLD}${COLOR_RED}=== $failed_count of $test_count kernel command line tests failed ===${COLOR_RESET}"
-    exit 1
-fi
+finish_test_matrix "kernel command line tests"

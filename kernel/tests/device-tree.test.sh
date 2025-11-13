@@ -16,78 +16,44 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$PROJECT_ROOT/tests/common.sh"
 
-# Parse verbose flag
-eval "$(parse_verbose_flag "$@")"
+init_test_matrix "$@" "Testing device tree enumeration"
 
-# Parse architectures to test
-ARCHS=$(parse_arch "$1")
-BOOT_TYPE_FILTER="$2"
+for arch in $TEST_MATRIX_ARCH; do
+    for boot_type in $TEST_MATRIX_BOOT_TYPE; do
+        test_section "device tree enumeration ($arch $boot_type)"
 
-# Only test kernel boot (skip if filter is "image")
-if [ "$BOOT_TYPE_FILTER" = "image" ]; then
-    echo "Skipping device tree tests (only kernel boot supported)"
-    exit 0
-fi
+        # AMD64 raw image doesn't support command line args (no bootloader yet)
+        if [ "$arch" = "amd64" ] && [ "$boot_type" = "image" ]; then
+            skip_test_case "AMD64 raw image doesn't support command line args"
+            continue
+        fi
 
-TIMEOUT=3
+        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
 
-# Color for info messages
-COLOR_CYAN='\033[0;36m'
-COLOR_RESET='\033[0m'
+        qemu_args=(
+            -append "'test=hello debug loglevel=7'"
+        )
+        output=$(run_test_case "$qemu_cmd ${qemu_args[*]}")
 
-echo -e "${COLOR_CYAN}Testing device tree enumeration${COLOR_RESET}"
+        # Increment test count manually since we're not using assert_count
+        TEST_MATRIX_TEST_COUNT=$((TEST_MATRIX_TEST_COUNT + 1))
 
-run_device_tree_test() {
-    local test_num="$1"
-    local arch="$2"
-    local image="$3"
-    local desc="$4"
+        # Check for device tree header
+        if ! echo "$output" | grep -q "Device tree:"; then
+            TEST_MATRIX_FAILED_COUNT=$((TEST_MATRIX_FAILED_COUNT + 1))
+            echo -e "  ${COLOR_RED}✗${COLOR_RESET} Device tree output not found"
+            continue
+        fi
 
-    echo "  Test $test_num: $desc"
+        # Check for at least one device (should have devices with @ address)
+        if ! echo "$output" | grep -q "@ 0x"; then
+            TEST_MATRIX_FAILED_COUNT=$((TEST_MATRIX_FAILED_COUNT + 1))
+            echo -e "  ${COLOR_RED}✗${COLOR_RESET} No devices found in tree (expected '@ 0x' pattern)"
+            continue
+        fi
 
-    check_image_exists "$image" "$arch" || return 1
-
-    test_timer_start
-    output=$(run_qemu_test "$arch" "$image" "test=hello debug loglevel=7" "$TIMEOUT")
-
-    if [ "$VERBOSE" -eq 1 ]; then
-        echo "    --- QEMU Output ---"
-        echo "$output" | sed 's/^/    /'
-        echo "    --- End Output ---"
-    fi
-
-    # Check for device tree output
-    if ! echo "$output" | grep -q "Device tree:"; then
-        test_fail "Device tree output not found"
-        return 1
-    fi
-
-    # Check for device entries (should have at least one device with @ address)
-    if ! echo "$output" | grep -q "@ 0x"; then
-        test_fail "No devices found in tree (expected '@ 0x' pattern)"
-        return 1
-    fi
-
-    test_pass "Device tree enumeration working"
-    return 0
-}
-
-test_count=0
-failed_count=0
-
-for arch in $ARCHS; do
-    test_section "Testing $arch"
-
-    kernel=$(get_kernel_path "$arch")
-
-    test_count=$((test_count + 1))
-    run_device_tree_test "$test_count" "$arch" "$kernel" "$arch device tree" || failed_count=$((failed_count + 1))
+        echo -e "  ${COLOR_GREEN}✓${COLOR_RESET} Device tree enumeration working"
+    done
 done
 
-echo ""
-if [ $failed_count -eq 0 ]; then
-    echo -e "${COLOR_BOLD}${COLOR_GREEN}=== All $test_count device tree tests passed ===${COLOR_RESET}"
-else
-    echo -e "${COLOR_BOLD}${COLOR_RED}=== $failed_count of $test_count device tree tests failed ===${COLOR_RESET}"
-    exit 1
-fi
+finish_test_matrix "device tree tests"

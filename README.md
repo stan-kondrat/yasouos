@@ -65,10 +65,12 @@ make ARCH=arm64 build   # ARM64 only
 make ARCH=amd64 build   # AMD64 only
 
 # Testing
-make test               # Test all architectures
+make test               # Test all architectures (kernel + image)
 make ARCH=riscv test    # Test RISC-V only
 make ARCH=arm64 test    # Test ARM64 only
 make ARCH=amd64 test    # Test AMD64 only
+make ARCH=riscv test-kernel   # Test RISC-V kernel only
+make ARCH=amd64 test-image    # Test AMD64 disk image only
 
 # Utility commands
 make check-deps         # Check dependencies for all architectures
