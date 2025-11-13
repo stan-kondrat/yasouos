@@ -1,4 +1,4 @@
-#include "netdev_mac.h"
+#include "netdev.h"
 #include "../../common/common.h"
 
 #define MAX_DEVICES 12
@@ -16,16 +16,7 @@ void app_mac_all(void) {
         puts(" MAC: ");
 
         uint8_t mac[6];
-        int result = -1;
-
-        // Determine driver type and get MAC
-        if (devices[i].driver == rtl8139_get_driver()) {
-            result = rtl8139_get_mac((rtl8139_t *)devices[i].context, mac);
-        } else if (devices[i].driver == virtio_net_get_driver()) {
-            result = virtio_net_get_mac((virtio_net_t *)devices[i].context, mac);
-        } else if (devices[i].driver == e1000_get_driver()) {
-            result = e1000_get_mac((e1000_t *)devices[i].context, mac);
-        }
+        int result = netdev_get_mac(&devices[i], mac);
 
         if (result == 0) {
             for (int j = 0; j < 6; j++) {

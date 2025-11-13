@@ -1,4 +1,4 @@
-#include "netdev_mac.h"
+#include "netdev.h"
 #include "../../common/common.h"
 
 #define MAX_NET_DEVICES 4

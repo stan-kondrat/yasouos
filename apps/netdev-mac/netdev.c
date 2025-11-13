@@ -1,4 +1,4 @@
-#include "netdev_mac.h"
+#include "netdev.h"
 #include "../../common/common.h"
 
 int netdev_acquire_all(device_entry_t *devices, int max_devices) {
@@ -67,4 +67,58 @@ int netdev_acquire_all(device_entry_t *devices, int max_devices) {
     }
 
     return device_count;
+}
+
+int netdev_get_mac(const device_entry_t *device, uint8_t mac[6]) {
+    if (device == NULL || mac == NULL) {
+        return -1;
+    }
+
+    if (device->driver == rtl8139_get_driver()) {
+        return rtl8139_get_mac((rtl8139_t *)device->context, mac);
+    } else if (device->driver == virtio_net_get_driver()) {
+        return virtio_net_get_mac((virtio_net_t *)device->context, mac);
+    } else if (device->driver == e1000_get_driver()) {
+        return e1000_get_mac((e1000_t *)device->context, mac);
+    }
+
+    return -1;
+}
+
+int netdev_transmit(const device_entry_t *device, const uint8_t *packet, size_t length) {
+    if (device == NULL || packet == NULL || length == 0) {
+        return -1;
+    }
+
+    // Dispatch to appropriate driver
+    if (device->driver == virtio_net_get_driver()) {
+        return virtio_net_transmit((virtio_net_t *)device->context, packet, length);
+    } else if (device->driver == e1000_get_driver()) {
+        // TODO: Implement e1000_transmit
+        return -1;
+    } else if (device->driver == rtl8139_get_driver()) {
+        // TODO: Implement rtl8139_transmit
+        return -1;
+    }
+
+    return -1;
+}
+
+int netdev_receive(const device_entry_t *device, uint8_t *buffer, size_t buffer_size, size_t *received_length) {
+    if (device == NULL || buffer == NULL || received_length == NULL) {
+        return -1;
+    }
+
+    // Dispatch to appropriate driver
+    if (device->driver == virtio_net_get_driver()) {
+        return virtio_net_receive((virtio_net_t *)device->context, buffer, buffer_size, received_length);
+    } else if (device->driver == e1000_get_driver()) {
+        // TODO: Implement e1000_receive
+        return -1;
+    } else if (device->driver == rtl8139_get_driver()) {
+        // TODO: Implement rtl8139_receive
+        return -1;
+    }
+
+    return -1;
 }
