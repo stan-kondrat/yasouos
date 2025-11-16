@@ -210,7 +210,7 @@ LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 DRIVER_DIR := drivers
 
 # Search paths for source files
-vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel/resources apps apps/illegal-instruction apps/random apps/netdev-mac apps/arp-broadcast apps/network/protocols/ethernet apps/network/protocols/arp $(DRIVER_DIR) \
+vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel/resources apps apps/illegal-instruction apps/random apps/netdev-mac apps/arp-broadcast apps/packet-print apps/network/ethernet apps/network/arp apps/network/ipv4 apps/network/tcp apps/network/udp $(DRIVER_DIR) \
           $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng $(DRIVER_DIR)/e1000 $(DRIVER_DIR)/rtl8139
 vpath %.S $(ARCH_DIR)
 
@@ -223,8 +223,12 @@ C_SOURCES += apps/netdev-mac/mac_rtl8139.c
 C_SOURCES += apps/netdev-mac/netdev.c
 C_SOURCES += apps/netdev-mac/mac_all.c
 C_SOURCES += apps/arp-broadcast/arp_broadcast.c
-C_SOURCES += apps/network/protocols/ethernet/ethernet.c
-C_SOURCES += apps/network/protocols/arp/arp.c
+C_SOURCES += apps/packet-print/packet_print.c
+C_SOURCES += apps/network/ethernet/ethernet.c
+C_SOURCES += apps/network/arp/arp.c
+C_SOURCES += apps/network/ipv4/ipv4.c
+C_SOURCES += apps/network/tcp/tcp.c
+C_SOURCES += apps/network/udp/udp.c
 C_SOURCES += kernel/resources/resources.c
 C_SOURCES += $(DRIVER_DIR)/virtio_net/virtio_net.c
 C_SOURCES += $(DRIVER_DIR)/virtio_blk/virtio_blk.c

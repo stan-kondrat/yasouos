@@ -42,13 +42,13 @@ _start:
     xorl %edi, %edi              # No boot info (zero)
 
 .have_boot_info:
-    # Set up identity paging for first 2MB
-    # PML4 at 0x1000
+    # Set up identity paging for first 4GB (for PCI MMIO)
+    # PML4 at 0x1000, need 24KB total (PML4 + PDPT + 4*PD)
     pushl %edi                   # Push 1 if we have boot info, 0 if not
     movl $0x1000, %edi
     movl %edi, %cr3
     xorl %eax, %eax
-    movl $4096, %ecx
+    movl $6144, %ecx             # Clear 24KB (6144 dwords)
     rep stosl
     movl %cr3, %edi
 
@@ -56,12 +56,26 @@ _start:
     movl $0x2003, (%edi)
     addl $0x1000, %edi
 
-    # PDPT[0] -> PD
+    # PDPT[0] -> PD0 (first 1GB)
     movl $0x3003, (%edi)
-    addl $0x1000, %edi
+    # PDPT[1] -> PD1 (second 1GB)
+    movl $0x4003, 8(%edi)
+    # PDPT[2] -> PD2 (third 1GB)
+    movl $0x5003, 16(%edi)
+    # PDPT[3] -> PD3 (fourth 1GB)
+    movl $0x6003, 24(%edi)
 
-    # PD[0] -> 2MB page
-    movl $0x0083, (%edi)
+    # Map first 4GB using 2MB pages
+    # PD0 at 0x3000
+    movl $0x3000, %edi
+    movl $0x0083, %eax          # 0x0083 = Present, R/W, 2MB page
+    movl $2048, %ecx            # 2048 * 2MB = 4GB
+.fill_pd:
+    movl %eax, (%edi)
+    addl $0x200000, %eax        # Next 2MB
+    addl $8, %edi
+    loop .fill_pd
+
     popl %edi
 
     # Enable PAE

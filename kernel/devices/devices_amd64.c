@@ -4,7 +4,12 @@
 // PCI configuration offsets
 #define PCI_VENDOR_ID_OFFSET    0x00
 #define PCI_DEVICE_ID_OFFSET    0x02
+#define PCI_COMMAND_OFFSET      0x04
 #define PCI_BAR0_OFFSET         0x10
+
+// PCI Command Register bits
+#define PCI_COMMAND_MEMORY      0x0002
+#define PCI_COMMAND_MASTER      0x0004
 
 // Legacy PCI I/O ports
 #define PCI_CONFIG_ADDRESS_PORT 0xCF8
@@ -16,17 +21,6 @@
 
 // PCI access method detection
 static bool use_ecam = false;
-
-// x86_64 I/O port operations
-static inline void io_outl(uint16_t port, uint32_t value) {
-    __asm__ volatile ("outl %0, %1" : : "a"(value), "Nd"(port));
-}
-
-static inline uint32_t io_inl(uint16_t port) {
-    uint32_t result;
-    __asm__ volatile ("inl %1, %0" : "=a"(result) : "Nd"(port));
-    return result;
-}
 
 // Legacy PCI I/O port access
 static uint32_t pci_make_address(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset) {
@@ -49,6 +43,16 @@ static uint32_t pci_io_read32(uint8_t bus, uint8_t device, uint8_t function, uin
     uint32_t address = pci_make_address(bus, device, function, offset);
     io_outl(PCI_CONFIG_ADDRESS_PORT, address);
     return io_inl(PCI_CONFIG_DATA_PORT);
+}
+
+static void pci_io_write16(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset, uint16_t value) {
+    uint32_t address = pci_make_address(bus, device, function, offset);
+    io_outl(PCI_CONFIG_ADDRESS_PORT, address);
+    uint32_t data = io_inl(PCI_CONFIG_DATA_PORT);
+    uint8_t shift = (offset & 2) * 8;
+    uint32_t mask = 0xFFFF << shift;
+    data = (data & ~mask) | ((uint32_t)value << shift);
+    io_outl(PCI_CONFIG_DATA_PORT, data);
 }
 
 static void pci_io_write32(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset, uint32_t value) {
@@ -80,6 +84,15 @@ static uint32_t pcie_ecam_read32(uint8_t bus, uint8_t device, uint8_t function, 
     return *addr;
 }
 
+static void pcie_ecam_write16(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset, uint16_t value) {
+    volatile uint32_t* addr = pcie_ecam_address(bus, device, function, offset);
+    uint32_t current = *addr;
+    uint8_t shift = (offset & 2) * 8;
+    uint32_t mask = 0xFFFF << shift;
+    uint32_t new_value = (current & ~mask) | ((uint32_t)value << shift);
+    *addr = new_value;
+}
+
 static void pcie_ecam_write32(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset, uint32_t value) {
     volatile uint32_t* addr = pcie_ecam_address(bus, device, function, offset);
     *addr = value;
@@ -98,6 +111,14 @@ static uint32_t pci_config_read32(uint8_t bus, uint8_t device, uint8_t function,
         return pcie_ecam_read32(bus, device, function, offset);
     }
     return pci_io_read32(bus, device, function, offset);
+}
+
+static void pci_config_write16(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset, uint16_t value) {
+    if (use_ecam) {
+        pcie_ecam_write16(bus, device, function, offset, value);
+    } else {
+        pci_io_write16(bus, device, function, offset, value);
+    }
 }
 
 static void pci_config_write32(uint8_t bus, uint8_t device, uint8_t function, uint16_t offset, uint32_t value) {
@@ -176,6 +197,11 @@ int devices_enumerate(device_callback_t callback, void *context) {
             uint16_t device_val = pci_config_read16(bus, device, 0, PCI_DEVICE_ID_OFFSET);
             uint32_t bar0 = pci_config_read32(bus, device, 0, PCI_BAR0_OFFSET);
             uint64_t bar_size = pci_probe_bar_size(bus, device, 0, PCI_BAR0_OFFSET);
+
+            // Enable bus mastering and memory access for PCI device
+            uint16_t command = pci_config_read16(bus, device, 0, PCI_COMMAND_OFFSET);
+            command |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
+            pci_config_write16(bus, device, 0, PCI_COMMAND_OFFSET, command);
 
             // AMD64/PCI doesn't use compatible strings - just vendor/device IDs
             device_t dev_info = {

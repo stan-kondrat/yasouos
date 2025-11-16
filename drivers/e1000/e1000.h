@@ -49,6 +49,48 @@
 #define E1000_TCTL_EN       (1 << 1)   // Transmit Enable
 #define E1000_TCTL_PSP      (1 << 3)   // Pad Short Packets
 
+// RX Descriptor Status Bits
+#define E1000_RXD_STAT_DD   (1 << 0)   // Descriptor Done
+#define E1000_RXD_STAT_EOP  (1 << 1)   // End of Packet
+
+// TX Descriptor Command Bits
+#define E1000_TXD_CMD_EOP   (1 << 0)   // End of Packet
+#define E1000_TXD_CMD_RS    (1 << 3)   // Report Status
+
+// TX Descriptor Status Bits
+#define E1000_TXD_STAT_DD   (1 << 0)   // Descriptor Done
+
+// Number of RX/TX descriptors
+#define E1000_NUM_RX_DESC   8
+#define E1000_NUM_TX_DESC   8
+#define E1000_RX_BUFFER_SIZE 2048
+#define E1000_TX_BUFFER_SIZE 2048
+
+/**
+ * E1000 RX Descriptor
+ */
+typedef struct {
+    uint64_t buffer_addr;
+    uint16_t length;
+    uint16_t checksum;
+    uint8_t  status;
+    uint8_t  errors;
+    uint16_t special;
+} __attribute__((packed)) e1000_rx_desc_t;
+
+/**
+ * E1000 TX Descriptor
+ */
+typedef struct {
+    uint64_t buffer_addr;
+    uint16_t length;
+    uint8_t  cso;
+    uint8_t  cmd;
+    uint8_t  status;
+    uint8_t  css;
+    uint16_t special;
+} __attribute__((packed)) e1000_tx_desc_t;
+
 /**
  * E1000 device context
  */
@@ -56,7 +98,13 @@ typedef struct {
     uint64_t mmio_base;
     bool initialized;
     uint8_t mac_addr[6];
-} e1000_t;
+    e1000_rx_desc_t rx_descs[E1000_NUM_RX_DESC] __attribute__((aligned(16)));
+    uint8_t rx_buffers[E1000_NUM_RX_DESC][E1000_RX_BUFFER_SIZE] __attribute__((aligned(16)));
+    uint16_t rx_current;
+    e1000_tx_desc_t tx_descs[E1000_NUM_TX_DESC] __attribute__((aligned(16)));
+    uint8_t tx_buffers[E1000_NUM_TX_DESC][E1000_TX_BUFFER_SIZE] __attribute__((aligned(16)));
+    uint16_t tx_current;
+} __attribute__((aligned(16))) e1000_t;
 
 /**
  * Get e1000 driver descriptor
@@ -71,3 +119,22 @@ const driver_t* e1000_get_driver(void);
  * @return 0 on success, -1 on error
  */
 int e1000_get_mac(e1000_t *ctx, uint8_t mac[6]);
+
+/**
+ * Receive a packet from e1000 device
+ * @param ctx Device context from driver initialization
+ * @param buffer Buffer to store received packet
+ * @param buffer_size Size of the buffer
+ * @param received_length Pointer to store received packet length
+ * @return 0 on success, -1 on error
+ */
+int e1000_receive(e1000_t *ctx, uint8_t *buffer, size_t buffer_size, size_t *received_length);
+
+/**
+ * Transmit a packet to e1000 device
+ * @param ctx Device context from driver initialization
+ * @param buffer Buffer containing packet to transmit
+ * @param length Length of packet to transmit
+ * @return 0 on success, -1 on error
+ */
+int e1000_transmit(e1000_t *ctx, const uint8_t *buffer, size_t length);

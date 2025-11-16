@@ -23,8 +23,8 @@ YasouOS includes support for the following devices:
 |--------|-----------|-----------|--------------|--------|
 | **virtio-net** | 0x1af4 | 0x1000 | All | ✅ Working |
 | **virtio-rng** | 0x1af4 | 0x1005 | All | ✅ Working |
-| **e1000** | 0x8086 | 0x100e | RISC-V | ✅ Working |
-| **rtl8139** | 0x10ec | 0x8139 | AMD64 | ✅ Working |
+| **e1000** | 0x8086 | 0x100e | All | ✅ Working |
+| **rtl8139** | 0x10ec | 0x8139 | All | ✅ Working |
 | **virtio-blk** | 0x1af4 | 0x1001 | All | 🚧 Stub |
 
 

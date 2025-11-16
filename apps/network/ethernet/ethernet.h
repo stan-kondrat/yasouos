@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../../common/types.h"
+#include "../../../common/types.h"
 
 #define ETH_P_ARP   0x0806
 #define ETH_P_IP    0x0800
@@ -15,5 +15,7 @@ typedef struct {
  * Print Ethernet frame header
  * @param frame Pointer to Ethernet frame data
  * @param length Frame length in bytes
+ * @param resource Resource to print tag for (optional, can be NULL)
+ * @param leftpad Number of spaces to pad on the left (use 0 for no padding)
  */
-void ethernet_print(const uint8_t *frame, size_t length);
+void ethernet_print(const uint8_t *frame, size_t length, const void *resource, int leftpad);

@@ -16,6 +16,7 @@
 #define RTL8139_RXBUF           0x30    // RX Buffer Address
 #define RTL8139_CMD             0x37    // Command Register
 #define RTL8139_CAPR            0x38    // Current Address of Packet Read
+#define RTL8139_CBR             0x3A    // Current Buffer Register
 #define RTL8139_IMR             0x3C    // Interrupt Mask Register
 #define RTL8139_ISR             0x3E    // Interrupt Status Register
 #define RTL8139_TCR             0x40    // Transmit Configuration
@@ -54,14 +55,26 @@
 #define RTL8139_TCR_CLRABT      (1 << 0)  // Clear Abort
 #define RTL8139_TCR_IFG_STD     (3 << 24) // Interframe Gap Standard
 
+// Transmit Status Register Bits
+#define RTL8139_TSD_OWN         (1 << 13) // DMA operation completed
+#define RTL8139_TSD_TOK         (1 << 15) // Transmit OK
+
+// RX Buffer size (8KB + 16 bytes for wrap + 1.5KB for overflow)
+#define RTL8139_RX_BUFFER_SIZE  (8192 + 16 + 1536)
+
 /**
  * RTL8139 device context
  */
 typedef struct {
     uint64_t mmio_base;
     bool initialized;
+    bool use_mmio;
     uint8_t mac_addr[6];
-} rtl8139_t;
+    uint16_t rx_offset;
+    volatile uint8_t rx_buffer[RTL8139_RX_BUFFER_SIZE] __attribute__((aligned(16)));
+    uint8_t tx_current;
+    uint8_t tx_buffer[2048] __attribute__((aligned(8)));
+} __attribute__((aligned(16))) rtl8139_t;
 
 /**
  * Get rtl8139 driver descriptor
@@ -76,3 +89,22 @@ const driver_t* rtl8139_get_driver(void);
  * @return 0 on success, -1 on error
  */
 int rtl8139_get_mac(rtl8139_t *ctx, uint8_t mac[6]);
+
+/**
+ * Receive a packet from rtl8139 device
+ * @param ctx Device context from driver initialization
+ * @param buffer Buffer to store received packet
+ * @param buffer_size Size of the buffer
+ * @param received_length Pointer to store received packet length
+ * @return 0 on success, -1 on error
+ */
+int rtl8139_receive(rtl8139_t *ctx, uint8_t *buffer, size_t buffer_size, size_t *received_length);
+
+/**
+ * Transmit a packet using rtl8139 device
+ * @param ctx Device context from driver initialization
+ * @param buffer Buffer containing packet to transmit
+ * @param length Length of the packet
+ * @return 0 on success, -1 on error
+ */
+int rtl8139_transmit(rtl8139_t *ctx, const uint8_t *buffer, size_t length);

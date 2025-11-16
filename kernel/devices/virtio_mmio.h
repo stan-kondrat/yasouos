@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../common/types.h"
+#include "../../common/common.h"
 #include "devices.h"
 
 // VirtIO MMIO registers (Legacy/v1)
@@ -93,40 +94,8 @@ static inline uint32_t mmio_read32(uint64_t addr) {
     return *(volatile uint32_t *)(uintptr_t)addr;
 }
 
-// VirtIO-PCI I/O port operations (for AMD64)
-#if defined(__x86_64__) || defined(__i386__)
-
-static inline void io_outb(uint16_t port, uint8_t value) {
-    __asm__ volatile ("outb %0, %1" : : "a"(value), "Nd"(port));
-}
-
-static inline void io_outw(uint16_t port, uint16_t value) {
-    __asm__ volatile ("outw %0, %1" : : "a"(value), "Nd"(port));
-}
-
-static inline void io_outl(uint16_t port, uint32_t value) {
-    __asm__ volatile ("outl %0, %1" : : "a"(value), "Nd"(port));
-}
-
-static inline uint8_t io_inb(uint16_t port) {
-    uint8_t result;
-    __asm__ volatile ("inb %1, %0" : "=a"(result) : "Nd"(port));
-    return result;
-}
-
-static inline uint16_t io_inw(uint16_t port) {
-    uint16_t result;
-    __asm__ volatile ("inw %1, %0" : "=a"(result) : "Nd"(port));
-    return result;
-}
-
-static inline uint32_t io_inl(uint16_t port) {
-    uint32_t result;
-    __asm__ volatile ("inl %1, %0" : "=a"(result) : "Nd"(port));
-    return result;
-}
-
 // VirtIO-PCI uses I/O ports for register access
+#if defined(__x86_64__) || defined(__i386__)
 static inline uint32_t virtio_pci_read32(uint16_t iobase, uint16_t offset) {
     return io_inl(iobase + offset);
 }

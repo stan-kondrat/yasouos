@@ -15,6 +15,7 @@
 #define PCI_DEVICE_ID_OFFSET    0x02
 #define PCI_COMMAND_OFFSET      0x04
 #define PCI_BAR0_OFFSET         0x10
+#define PCI_BAR1_OFFSET         0x14
 
 // PCI Command Register bits
 #define PCI_COMMAND_IO          0x0001  // Enable I/O space
@@ -94,32 +95,32 @@ static uint64_t pci_probe_bar_size(uint8_t bus, uint8_t device, uint8_t function
     return (~size_mask) + 1;
 }
 
-// Assign BAR address if not already configured
+// Assign BAR address, always reassigning to avoid QEMU overlaps
 static uint32_t pci_assign_bar_if_needed(uint8_t bus, uint8_t device, uint8_t function,
                                           uint8_t bar_offset, uint64_t bar_size) {
     uint32_t bar_value = pcie_ecam_read32(bus, device, function, bar_offset);
 
-    // Check if BAR is already assigned (non-zero address)
-    if ((bar_value & 0x1) == 0) {
-        // Memory BAR
-        uint32_t addr = bar_value & 0xFFFFFFF0;
-        if (addr != 0) {
-            return bar_value;  // Already assigned
-        }
-
-        // Assign new address
-        if (bar_size > 0 && next_mmio_address + bar_size <= PCI_MMIO_BASE + PCI_MMIO_SIZE) {
-            uint32_t new_bar = (uint32_t)next_mmio_address | (bar_value & 0xF);
-            pcie_ecam_write32(bus, device, function, bar_offset, new_bar);
-            next_mmio_address += bar_size;
-            return new_bar;
-        }
-    } else {
-        // I/O BAR - skip assignment on RISC-V (no I/O port space)
+    if ((bar_value & 0x1) != 0) {
         return bar_value;
     }
 
-    return bar_value;
+    if (bar_size == 0) {
+        return bar_value;
+    }
+
+    if (next_mmio_address + bar_size > PCI_MMIO_BASE + PCI_MMIO_SIZE) {
+        return bar_value;
+    }
+
+    uint64_t aligned_address = (next_mmio_address + (bar_size - 1)) & ~(bar_size - 1);
+    if (aligned_address + bar_size > PCI_MMIO_BASE + PCI_MMIO_SIZE) {
+        return bar_value;
+    }
+
+    uint32_t new_bar = (uint32_t)aligned_address | (bar_value & 0xF);
+    pcie_ecam_write32(bus, device, function, bar_offset, new_bar);
+    next_mmio_address = aligned_address + bar_size;
+    return new_bar;
 }
 
 // Detect if ECAM is available by probing the ECAM region
@@ -198,8 +199,8 @@ typedef struct {
 
 static pci_bar_info_t pci_read_bar(uint8_t bus, uint8_t device_num, uint8_t bar_index) {
     uint16_t bar_offset = PCI_BAR0_OFFSET + (bar_index * 4);
-    uint32_t bar_value = pcie_ecam_read32(bus, device_num, 0, bar_offset);
     uint64_t bar_size = pci_probe_bar_size(bus, device_num, 0, bar_offset);
+    uint32_t bar_value = pcie_ecam_read32(bus, device_num, 0, bar_offset);
 
     return (pci_bar_info_t){
         .bar_value = bar_value,
@@ -232,7 +233,9 @@ typedef struct {
 static pci_selected_bar_t pci_select_bar_for_device([[maybe_unused]] uint8_t bus,
                                                       [[maybe_unused]] uint8_t device_num,
                                                       uint16_t vendor_id,
+                                                      [[maybe_unused]] uint16_t device_id,
                                                       const pci_bar_info_t* bar0,
+                                                      const pci_bar_info_t* bar1,
                                                       const pci_bar_info_t* bar4) {
     if (pci_is_virtio_with_io_bar(vendor_id, bar0->bar_value)) {
         puts("  VirtIO device detected, using BAR4 for MMIO\n");
@@ -241,6 +244,16 @@ static pci_selected_bar_t pci_select_bar_for_device([[maybe_unused]] uint8_t bus
         return (pci_selected_bar_t){
             .base_address = pci_bar_get_address(bar4->bar_value),
             .size = bar4->bar_size
+        };
+    }
+
+    if (pci_bar_is_io(bar0->bar_value) && bar1->bar_size > 0 && !pci_bar_is_io(bar1->bar_value)) {
+        puts("  BAR0 is I/O, using BAR1 for MMIO\n");
+        pci_print_selected_bar("BAR1", pci_bar_get_address(bar1->bar_value), bar1->bar_value, bar1->bar_size);
+
+        return (pci_selected_bar_t){
+            .base_address = pci_bar_get_address(bar1->bar_value),
+            .size = bar1->bar_size
         };
     }
 
@@ -290,11 +303,15 @@ static void pci_process_device(uint8_t bus, uint8_t device_num,
     pci_print_device_header(vendor_id, device_id, bus, device_num);
 
     pci_bar_info_t bar0 = pci_read_bar(bus, device_num, 0);
+    pci_bar_info_t bar1 = pci_read_bar(bus, device_num, 1);
     pci_bar_info_t bar4 = pci_read_bar(bus, device_num, 4);
 
     // Assign BARs if not already configured
     if (bar0.bar_size > 0) {
         bar0.bar_value = pci_assign_bar_if_needed(bus, device_num, 0, PCI_BAR0_OFFSET, bar0.bar_size);
+    }
+    if (bar1.bar_size > 0) {
+        bar1.bar_value = pci_assign_bar_if_needed(bus, device_num, 0, PCI_BAR1_OFFSET, bar1.bar_size);
     }
     if (bar4.bar_size > 0) {
         bar4.bar_value = pci_assign_bar_if_needed(bus, device_num, 0, PCI_BAR4_OFFSET, bar4.bar_size);
@@ -302,7 +319,7 @@ static void pci_process_device(uint8_t bus, uint8_t device_num,
 
     pci_print_all_bars(bus, device_num);
 
-    pci_selected_bar_t selected_bar = pci_select_bar_for_device(bus, device_num, vendor_id, &bar0, &bar4);
+    pci_selected_bar_t selected_bar = pci_select_bar_for_device(bus, device_num, vendor_id, device_id, &bar0, &bar1, &bar4);
 
     // Enable memory access in PCI command register
     uint16_t command = pcie_ecam_read16(bus, device_num, 0, PCI_COMMAND_OFFSET);

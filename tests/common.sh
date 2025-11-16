@@ -180,6 +180,7 @@ test_section() {
 # Test matrix framework variables
 TEST_MATRIX_ARCH=""
 TEST_MATRIX_BOOT_TYPE=""
+TEST_MATRIX_NET_DEVICE=""
 TEST_MATRIX_VERBOSE=0
 TEST_MATRIX_TEST_COUNT=0
 TEST_MATRIX_FAILED_COUNT=0
@@ -188,17 +189,18 @@ COLOR_CYAN='\033[0;36m'
 
 # Initialize test matrix framework
 # Usage: init_test_matrix "$@" ["optional custom message"]
-# Parses command line arguments for verbose flag, architecture, and boot type
+# Parses command line arguments for verbose flag, architecture, boot type, and network device
 # Optionally displays a custom message before parsing
 init_test_matrix() {
     local message=""
     local args=("$@")
 
-    # Check if last argument is a message (not a flag or arch/boot_type)
+    # Check if last argument is a message (not a flag or arch/boot_type/net_device)
     local last_arg="${args[${#args[@]}-1]}"
     if [ "${#args[@]}" -gt 0 ] && [ "$last_arg" != "-v" ] && \
        [ "$last_arg" != "kernel" ] && [ "$last_arg" != "image" ] && \
-       [ "$last_arg" != "riscv" ] && [ "$last_arg" != "arm64" ] && [ "$last_arg" != "amd64" ]; then
+       [ "$last_arg" != "riscv" ] && [ "$last_arg" != "arm64" ] && [ "$last_arg" != "amd64" ] && \
+       [ "$last_arg" != "e1000" ] && [ "$last_arg" != "rtl8139" ] && [ "$last_arg" != "virtio-net" ]; then
         message="$last_arg"
         unset 'args[${#args[@]}-1]'
     fi
@@ -213,6 +215,7 @@ init_test_matrix() {
 
     local arch_arg="${args[0]}"
     local boot_type_arg="${args[1]}"
+    local net_device_arg="${args[2]}"
 
     # Display custom message if provided
     if [ -n "$message" ]; then
@@ -234,6 +237,31 @@ init_test_matrix() {
     else
         TEST_MATRIX_BOOT_TYPE="kernel image"
     fi
+
+    # Store the network device argument for later use with get_net_devices_for_arch
+    TEST_MATRIX_NET_DEVICE="$net_device_arg"
+}
+
+# Get network devices for a specific architecture
+# Usage: get_net_devices_for_arch <arch> <net_device_arg>
+# Returns: Space-separated list of network devices for the architecture
+get_net_devices_for_arch() {
+    local arch="$1"
+    local net_device_arg="$2"
+    local virtio_device=$([ "$arch" = "amd64" ] && echo "virtio-net-pci" || echo "virtio-net-device")
+    local all_devices="e1000 rtl8139 $virtio_device"
+
+    case "$net_device_arg" in
+        e1000|rtl8139)
+            echo "$net_device_arg"
+            ;;
+        virtio-net)
+            echo "$virtio_device"
+            ;;
+        *)
+            echo "$all_devices"
+            ;;
+    esac
 }
 
 # Build full QEMU command with machine flags, kernel/image, and common flags

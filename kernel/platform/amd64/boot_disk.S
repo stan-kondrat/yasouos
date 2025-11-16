@@ -16,8 +16,9 @@ _start:
     movw $0x7C00, %sp
 
     # Load kernel from disk (sector 2 onwards)
+    # Load 128 sectors (64KB) to handle larger kernel
     movb $0x02, %ah
-    movb $64, %al
+    movb $127, %al              # Load 127 sectors (BIOS limit per call)
     movb $0, %ch
     movb $2, %cl
     movb $0, %dh
@@ -158,12 +159,12 @@ protected_mode:
     movw %ax, %gs
     movw %ax, %ss
 
-    # Set up identity paging for first 2MB
-    # PML4 at 0x1000
+    # Set up identity paging for first 4GB (for PCI MMIO)
+    # PML4 at 0x1000, need 24KB total (PML4 + PDPT + 4*PD)
     movl $0x1000, %edi
     movl %edi, %cr3
     xorl %eax, %eax
-    movl $4096, %ecx
+    movl $6144, %ecx            # Clear 24KB (6144 dwords)
     rep stosl
     movl %cr3, %edi
 
@@ -171,12 +172,25 @@ protected_mode:
     movl $0x2003, (%edi)
     addl $0x1000, %edi
 
-    # PDPT[0] -> PD
+    # PDPT[0] -> PD0 (first 1GB)
     movl $0x3003, (%edi)
-    addl $0x1000, %edi
+    # PDPT[1] -> PD1 (second 1GB)
+    movl $0x4003, 8(%edi)
+    # PDPT[2] -> PD2 (third 1GB)
+    movl $0x5003, 16(%edi)
+    # PDPT[3] -> PD3 (fourth 1GB)
+    movl $0x6003, 24(%edi)
 
-    # PD[0] -> 2MB page
-    movl $0x0083, (%edi)
+    # Map first 4GB using 2MB pages
+    # Fill all 4 PDs (PD0-PD3), each with 512 entries
+    movl $0x3000, %edi          # Start at PD0
+    movl $0x0083, %eax          # 0x0083 = Present, R/W, 2MB page
+    movl $2048, %ecx            # 2048 entries total (512 per PD * 4 PDs)
+.fill_pd_disk:
+    movl %eax, (%edi)
+    addl $0x200000, %eax        # Next 2MB
+    addl $8, %edi               # Next entry
+    loop .fill_pd_disk
 
     # Enable PAE
     movl %cr4, %eax
