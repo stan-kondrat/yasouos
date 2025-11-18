@@ -1,6 +1,7 @@
 #include "ipv4.h"
 #include "../tcp/tcp.h"
 #include "../udp/udp.h"
+#include "../icmp/icmp.h"
 #include "../net_utils.h"
 
 void ipv4_print(const uint8_t *packet, size_t length, int leftpad) {
@@ -10,9 +11,9 @@ void ipv4_print(const uint8_t *packet, size_t length, int leftpad) {
     }
 
     const ipv4_hdr_t *ip = (const ipv4_hdr_t *)packet;
-    uint16_t total_len = ntohs(ip->total_length);
-    uint32_t src_ip = ntohl(ip->src_ip);
-    uint32_t dst_ip = ntohl(ip->dst_ip);
+    uint16_t total_len = ntohs_unaligned(&ip->total_length);
+    uint32_t src_ip = ntohl_unaligned(&ip->src_ip);
+    uint32_t dst_ip = ntohl_unaligned(&ip->dst_ip);
 
     for (int i = 0; i < leftpad; i++) {
         putchar(' ');
@@ -41,6 +42,8 @@ void ipv4_print(const uint8_t *packet, size_t length, int leftpad) {
         tcp_print(payload, payload_len, leftpad + 2);
     } else if (ip->protocol == IPPROTO_UDP) {
         udp_print(packet, length, leftpad + 2);
+    } else if (ip->protocol == IPPROTO_ICMP) {
+        icmp_print(payload, payload_len, leftpad + 2);
     }
 }
 

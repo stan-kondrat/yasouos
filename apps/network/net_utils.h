@@ -2,28 +2,7 @@
 
 #include "../../common/types.h"
 #include "../../common/common.h"
-
-static inline uint16_t ntohs(uint16_t x) {
-    return (x >> 8) | (x << 8);
-}
-
-static inline uint16_t htons(uint16_t x) {
-    return (x >> 8) | (x << 8);
-}
-
-static inline uint32_t ntohl(uint32_t x) {
-    return ((x >> 24) & 0x000000FF) |
-           ((x >> 8)  & 0x0000FF00) |
-           ((x << 8)  & 0x00FF0000) |
-           ((x << 24) & 0xFF000000);
-}
-
-static inline uint32_t htonl(uint32_t x) {
-    return ((x >> 24) & 0x000000FF) |
-           ((x >> 8)  & 0x0000FF00) |
-           ((x << 8)  & 0x00FF0000) |
-           ((x << 24) & 0xFF000000);
-}
+#include "../../common/byteorder.h"
 
 static inline void net_print_mac(const uint8_t mac[6]) {
     for (int i = 0; i < 6; i++) {

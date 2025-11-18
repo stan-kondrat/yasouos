@@ -2,6 +2,7 @@
 #include "../net_utils.h"
 #include "../ethernet/ethernet.h"
 #include "../../../common/common.h"
+#include "../../../common/byteorder.h"
 
 void arp_print(const arp_hdr_t *arp, int leftpad) {
     if (!arp) {
@@ -15,15 +16,15 @@ void arp_print(const arp_hdr_t *arp, int leftpad) {
     }
     if (opcode == ARP_OP_REQUEST) {
         puts("ARP Request: who-has ");
-        net_print_ip(ntohl(arp->target_ip));
+        net_print_ip(ntohl_unaligned(&arp->target_ip));
         puts(" tell ");
-        net_print_ip(ntohl(arp->sender_ip));
+        net_print_ip(ntohl_unaligned(&arp->sender_ip));
         puts(" (");
         net_print_mac(arp->sender_mac);
         puts(")\n");
     } else if (opcode == ARP_OP_REPLY) {
         puts("ARP Reply: ");
-        net_print_ip(ntohl(arp->sender_ip));
+        net_print_ip(ntohl_unaligned(&arp->sender_ip));
         puts(" is-at ");
         net_print_mac(arp->sender_mac);
         puts("\n");
@@ -58,8 +59,8 @@ void arp_build_request(uint8_t *packet,
         arp->sender_mac[i] = sender_mac[i];
         arp->target_mac[i] = 0x00;
     }
-    arp->sender_ip = htonl(sender_ip);
-    arp->target_ip = htonl(target_ip);
+    write_htonl_unaligned(&arp->sender_ip, sender_ip);
+    write_htonl_unaligned(&arp->target_ip, target_ip);
 }
 
 void arp_build_reply(uint8_t *packet,
@@ -86,8 +87,8 @@ void arp_build_reply(uint8_t *packet,
         arp->sender_mac[i] = sender_mac[i];
         arp->target_mac[i] = target_mac[i];
     }
-    arp->sender_ip = htonl(sender_ip);
-    arp->target_ip = htonl(target_ip);
+    write_htonl_unaligned(&arp->sender_ip, sender_ip);
+    write_htonl_unaligned(&arp->target_ip, target_ip);
 }
 
 const arp_hdr_t* arp_parse(const uint8_t *packet, size_t length, arp_hdr_t *out_arp) {

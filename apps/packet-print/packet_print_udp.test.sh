@@ -21,6 +21,9 @@ run_packet_print_test() {
     local random_num=$((1 + RANDOM % 8))
     local request_string="ping-$random_num"
     local response_expected="pong-$((random_num + 1))"
+    local udp_port_guest=5000
+    local udp_port_host=$((20000 + RANDOM % 10000))
+    local udp_port_remote=$((10000 + RANDOM % 10000))
 
     qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
 
@@ -29,7 +32,7 @@ run_packet_print_test() {
     qemu_args=(
         -append "'app=packet-print'"
         -device "$net_device,netdev=net0,mac=52:54:00:12:34:56"
-        -netdev "dgram,id=net0,local.type=inet,local.host=127.0.0.1,local.port=5001,remote.type=inet,remote.host=127.0.0.1,remote.port=12341"
+        -netdev "dgram,id=net0,local.type=inet,local.host=127.0.0.1,local.port=$udp_port_host,remote.type=inet,remote.host=127.0.0.1,remote.port=$udp_port_remote"
         -object "filter-dump,id=dump,netdev=net0,file=$pcap_file"
     )
 
@@ -65,13 +68,13 @@ run_packet_print_test() {
 
     # Send raw Ethernet frame with UDP packet
     if [ "$VERBOSE" = "1" ]; then
-        echo "Sending UDP packet with $request_string via dgram socket to localhost:5001..."
+        echo "Sending UDP packet with $request_string via dgram socket to localhost:$udp_port_host..."
     fi
 
     # Create a raw Ethernet frame containing UDP packet using printf
     # Ethernet: dst=52:54:00:12:34:56, src=52:55:0a:00:02:02, type=0x0800 (IPv4)
     # IPv4: src=10.0.2.2, dst=10.0.2.15, proto=17 (UDP)
-    # UDP: src=5001, dst=5000, payload="ping-$random_num"
+    # UDP: src=$udp_port_host, dst=$udp_port_guest, payload="ping-$random_num"
     packet_file=$(mktemp)
 
     # Build payload as ASCII string "ping-N"
@@ -96,8 +99,10 @@ run_packet_print_test() {
     printf '\x0a\x00\x02\x0f' >> "$packet_file"         # dst IP (10.0.2.15)
 
     # UDP header (8 bytes)
-    printf '\x13\x89' >> "$packet_file"                 # src port (5001)
-    printf '\x13\x88' >> "$packet_file"                 # dst port (5000)
+    printf "\\x$(printf '%02x' $((udp_port_host >> 8)))" >> "$packet_file"  # src port high byte
+    printf "\\x$(printf '%02x' $((udp_port_host & 0xFF)))" >> "$packet_file"  # src port low byte
+    printf "\\x$(printf '%02x' $((udp_port_guest >> 8)))" >> "$packet_file"  # dst port high byte
+    printf "\\x$(printf '%02x' $((udp_port_guest & 0xFF)))" >> "$packet_file"  # dst port low byte
     printf "\\x$(printf '%02x' $((udp_len >> 8)))" >> "$packet_file"  # UDP length high byte
     printf "\\x$(printf '%02x' $((udp_len & 0xFF)))" >> "$packet_file"  # UDP length low byte
     printf '\x00\x00' >> "$packet_file"                 # checksum (0)
@@ -106,7 +111,7 @@ run_packet_print_test() {
     printf "%s" "$payload" >> "$packet_file"
 
     # Send packet via netcat
-    timeout 1 nc -u -w 1 127.0.0.1 5001 < "$packet_file" 2>/dev/null || true
+    timeout 1 nc -u -w 1 127.0.0.1 "$udp_port_host" < "$packet_file" 2>/dev/null || true
 
     rm -f "$packet_file"
 
@@ -154,7 +159,7 @@ run_packet_print_test() {
     fi
 
     # Check PCAP for the response payload containing expected response
-    pcap_ascii=$(tcpdump -qns 0 -A -r "$pcap_file" 2>&1 | grep -A 5 "10.0.2.15.5000 > 10.0.2.2.5001" || echo "")
+    pcap_ascii=$(tcpdump -qns 0 -A -r "$pcap_file" 2>&1 | grep -A 5 "10.0.2.15.$udp_port_guest > 10.0.2.2.$udp_port_host" || echo "")
     assert_contains "$pcap_ascii" "$response_expected" "UDP echo response payload verified ($response_expected in PCAP)"
 
     if [ "$VERBOSE" = "1" ]; then

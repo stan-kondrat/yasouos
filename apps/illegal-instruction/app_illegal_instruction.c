@@ -1,5 +1,5 @@
 // app_illegal_instruction.c - Test application that executes an illegal instruction
-#include <stdint.h>
+#include "types.h"
 
 void app_illegal_instruction(void) {
 #if defined(__aarch64__)

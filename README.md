@@ -59,7 +59,7 @@ The project uses a simplified Makefile that supports all three architectures wit
 make                    # Build and test all architectures (default)
 
 # Build all architectures
-make build              # Builds kernels and disk images for all archs
+make build              # Builds kernels, disk images, and unit tests for all archs
 
 # Build specific architecture
 make ARCH=riscv build   # RISC-V only
@@ -67,12 +67,14 @@ make ARCH=arm64 build   # ARM64 only
 make ARCH=amd64 build   # AMD64 only
 
 # Testing
-make test               # Test all architectures (kernel + image)
+make test               # Test all architectures (kernel + image + unit tests)
 make ARCH=riscv test    # Test RISC-V only
 make ARCH=arm64 test    # Test ARM64 only
 make ARCH=amd64 test    # Test AMD64 only
 make ARCH=riscv test-kernel   # Test RISC-V kernel only
 make ARCH=amd64 test-image    # Test AMD64 disk image only
+make unit-tests         # Run unit tests only for all architectures
+make ARCH=amd64 unit-tests    # Run AMD64 unit tests only
 
 # Utility commands
 make check-deps         # Check dependencies for all architectures
@@ -104,6 +106,7 @@ The build system automatically detects available cross-compilers:
 
 - [Kernel Command Line Arguments](docs/kernel-command-line.md) - Examples for RISC-V, ARM64, and AMD64
 - [Network Drivers](docs/network-drivers.md) - Supported network devices and applications
+- [Unit Tests](tests/test-kernel/UNIT_TESTS.md) - Running unit tests in QEMU
 
 ## Thanks
 - Inspired by https://github.com/nuta/operating-system-in-1000-lines

@@ -19,9 +19,9 @@ void udp_print(const uint8_t *ip_packet, size_t length, int leftpad) {
 
     // UDP header is after IPv4 header
     const udp_hdr_t *udp = (const udp_hdr_t *)(ip_packet + ihl);
-    uint16_t src_port = ntohs(udp->src_port);
-    uint16_t dst_port = ntohs(udp->dst_port);
-    uint16_t len = ntohs(udp->length);
+    uint16_t src_port = ntohs_unaligned(&udp->src_port);
+    uint16_t dst_port = ntohs_unaligned(&udp->dst_port);
+    uint16_t len = ntohs_unaligned(&udp->length);
 
     for (int i = 0; i < leftpad; i++) {
         putchar(' ');

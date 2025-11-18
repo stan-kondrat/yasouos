@@ -5,7 +5,10 @@
 #include "../network/arp/arp.h"
 #include "../network/ipv4/ipv4.h"
 #include "../network/udp/udp.h"
+#include "../network/tcp/tcp.h"
+#include "../network/icmp/icmp.h"
 #include "../../common/common.h"
+#include "../../common/byteorder.h"
 
 void app_packet_print(void) {
     puts("\n[packet-print] Starting packet-print application...\n");
@@ -50,28 +53,27 @@ void app_packet_print(void) {
         size_t received_length = 0;
         result = netdev_receive(&devices[0], buffer, PACKET_PRINT_BUFFER_SIZE, &received_length);
 
-
         if (result == 0 && received_length > 0) {
             ethernet_print(buffer, received_length, devices[0].resource, 0);
 
             if (received_length >= sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t)) {
                 const eth_hdr_t *eth = (const eth_hdr_t *)buffer;
-                uint16_t eth_type = ntohs(eth->type);
+                uint16_t eth_type = ntohs_unaligned(&eth->type);
 
                 if (eth_type == ETH_P_IP) {
                     const ipv4_hdr_t *ip = (const ipv4_hdr_t *)(buffer + sizeof(eth_hdr_t));
 
                     if (ip->protocol == IPPROTO_UDP) {
-                        uint32_t dst_ip = ntohl(ip->dst_ip);
+                        uint32_t dst_ip = ntohl_unaligned(&ip->dst_ip);
 
                         if (dst_ip == PACKET_PRINT_IP_ADDR) {
                             const udp_hdr_t *udp = (const udp_hdr_t *)(buffer + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
-                            uint16_t dst_port = ntohs(udp->dst_port);
+                            uint16_t dst_port = ntohs_unaligned(&udp->dst_port);
 
                             if (dst_port == PACKET_PRINT_UDP_PORT) {
                                 // Extract payload
                                 const uint8_t *payload = buffer + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
-                                size_t payload_len = ntohs(udp->length) - sizeof(udp_hdr_t);
+                                size_t payload_len = ntohs_unaligned(&udp->length) - sizeof(udp_hdr_t);
 
                                 resource_print_tag(devices[0].resource);
                                 puts(" Received UDP payload: ");
@@ -144,8 +146,8 @@ void app_packet_print(void) {
 
                                     // Build UDP header
                                     udp_hdr_t *reply_udp = (udp_hdr_t *)(reply_buffer + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
-                                    uint16_t src_port = ntohs(udp->dst_port);
-                                    uint16_t dst_port = ntohs(udp->src_port);
+                                    uint16_t src_port = ntohs_unaligned(&udp->dst_port);
+                                    uint16_t dst_port = ntohs_unaligned(&udp->src_port);
                                     udp_build_header(reply_udp, src_port, dst_port, response_len);
 
                                     // Copy response payload
@@ -165,15 +167,70 @@ void app_packet_print(void) {
                                 }
                             }
                         }
+                    } else if (ip->protocol == IPPROTO_TCP) {
+                        if (received_length >= sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(tcp_hdr_t)) {
+                            uint32_t dst_ip = ntohl_unaligned(&ip->dst_ip);
+
+                            if (dst_ip == PACKET_PRINT_IP_ADDR) {
+                                const tcp_hdr_t *tcp = (const tcp_hdr_t *)(buffer + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
+                                uint16_t dst_port = ntohs_unaligned(&tcp->dst_port);
+
+                                if (dst_port == PACKET_PRINT_IPV4_PORT) {
+                                    resource_print_tag(devices[0].resource);
+                                    puts(" TCP packet received\n");
+                                    handled_request = true;
+                                }
+                            }
+                        }
+                    } else if (ip->protocol == IPPROTO_ICMP) {
+                        if (received_length >= sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(icmp_hdr_t)) {
+                            uint32_t dst_ip = ntohl_unaligned(&ip->dst_ip);
+
+                            if (dst_ip == PACKET_PRINT_IP_ADDR) {
+                                const icmp_hdr_t *icmp = (const icmp_hdr_t *)(buffer + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
+                                uint8_t type = 0;
+                                uint16_t id = 0;
+                                uint16_t sequence = 0;
+
+                                if (icmp_parse((const uint8_t *)icmp, sizeof(icmp_hdr_t), &type, 0, &id, &sequence)) {
+                                    if (type == ICMP_ECHO_REQUEST) {
+                                        eth_hdr_t *reply_eth = (eth_hdr_t *)reply_buffer;
+                                        ipv4_hdr_t *reply_ip = (ipv4_hdr_t *)(reply_buffer + sizeof(eth_hdr_t));
+                                        icmp_hdr_t *reply_icmp = (icmp_hdr_t *)(reply_buffer + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t));
+                                        size_t total_len = sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(icmp_hdr_t);
+
+                                        // Build Ethernet header
+                                        for (int i = 0; i < 6; i++) {
+                                            reply_eth->dst[i] = eth->src[i];
+                                            reply_eth->src[i] = mac[i];
+                                        }
+                                        reply_eth->type = htons(ETH_P_IP);
+
+                                        // Build IPv4 header
+                                        ipv4_build_header(reply_ip, ip->dst_ip, ip->src_ip, IPPROTO_ICMP, sizeof(icmp_hdr_t), 64);
+
+                                        // Build ICMP header
+                                        icmp_build_response(reply_icmp, id, sequence);
+
+                                        result = netdev_transmit(&devices[0], reply_buffer, total_len);
+                                        if (result == 0) {
+                                            resource_print_tag(devices[0].resource);
+                                            puts(" Sent ICMP echo reply\n");
+                                            handled_request = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 } else if (eth_type == ETH_P_ARP) {
                     // Handle ARP requests
                     const arp_hdr_t *arp_req = (const arp_hdr_t *)(buffer + sizeof(eth_hdr_t));
-                    uint16_t opcode = ntohs(arp_req->opcode);
-                    uint32_t target_ip = ntohl(arp_req->target_ip);
+                    uint16_t opcode = ntohs_unaligned(&arp_req->opcode);
+                    uint32_t target_ip = ntohl_unaligned(&arp_req->target_ip);
 
                     if (opcode == ARP_OP_REQUEST && target_ip == PACKET_PRINT_IP_ADDR) {
-                        uint32_t sender_ip = ntohl(arp_req->sender_ip);
+                        uint32_t sender_ip = ntohl_unaligned(&arp_req->sender_ip);
 
                         arp_build_reply(reply_buffer,
                                        mac,

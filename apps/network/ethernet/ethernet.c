@@ -11,7 +11,7 @@ void ethernet_print(const uint8_t *frame, size_t length, const void *resource, i
     }
 
     const eth_hdr_t *eth = (const eth_hdr_t *)frame;
-    uint16_t eth_type = ntohs(eth->type);
+    uint16_t eth_type = ntohs_unaligned(&eth->type);
 
     if (resource) {
         resource_print_tag((const resource_t *)resource);
@@ -33,9 +33,9 @@ void ethernet_print(const uint8_t *frame, size_t length, const void *resource, i
     const uint8_t *payload = frame + sizeof(eth_hdr_t);
     size_t payload_len = length - sizeof(eth_hdr_t);
 
-    if (eth_type == ETH_P_IP) {
-        ipv4_print(payload, payload_len, leftpad + 2);
-    } else if (eth_type == ETH_P_ARP) {
+    if (eth_type == ETH_P_ARP) {
         arp_print((const arp_hdr_t *)payload, leftpad + 2);
+    } else if (eth_type == ETH_P_IP) {
+        ipv4_print(payload, payload_len, leftpad + 2);
     }
 }

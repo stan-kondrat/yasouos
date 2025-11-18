@@ -2,6 +2,9 @@
 
 #include "../../../common/types.h"
 
+#define IPV4(a, b, c, d) \
+    ((uint32_t)(((a) << 24) | ((b) << 16) | ((c) << 8) | (d)))
+
 #define IPPROTO_ICMP 1
 #define IPPROTO_TCP  6
 #define IPPROTO_UDP  17

@@ -255,7 +255,10 @@ jobs:
         $QEMU_BINARY --version | head -1
         $CC --version | head -1
         echo "=== Running test ==="
-        timeout 30s make ARCH=${{ matrix.arch }} CC=$CC QEMU=$QEMU_BINARY test-${{ matrix.boot_type }}
+        timeout 300s make ARCH=${{ matrix.arch }} CC=$CC QEMU=$QEMU_BINARY test-${{ matrix.boot_type }} || {
+          echo "=== Test failed with exit code $? ==="
+          exit 1
+        }
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
@@ -266,6 +269,14 @@ jobs:
           build/${{ matrix.arch }}/
         retention-days: 7
 
+    - name: List test artifacts on failure
+      if: failure()
+      run: |
+        echo "=== Listing build directory ==="
+        find build -type f -name "*.log" 2>/dev/null || echo "No logs in build/"
+        echo "=== Listing build-test directory ==="
+        find build-test -type f -name "*.log" 2>/dev/null || echo "No logs in build-test/"
+
     - name: Upload test logs
       uses: actions/upload-artifact@v4
       if: failure()
@@ -273,4 +284,5 @@ jobs:
         name: yasouos-${{ matrix.arch }}-${{ matrix.boot_type }}-test-logs
         path: |
           build/${{ matrix.arch }}/test-*.log
+          build-test/**/test-*.log
         retention-days: 7

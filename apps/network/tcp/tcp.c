@@ -8,11 +8,11 @@ void tcp_print(const uint8_t *tcp_segment, size_t length, int leftpad) {
     }
 
     const tcp_hdr_t *tcp = (const tcp_hdr_t *)tcp_segment;
-    uint16_t src_port = ntohs(tcp->src_port);
-    uint16_t dst_port = ntohs(tcp->dst_port);
-    uint32_t seq = ntohl(tcp->seq_num);
-    uint32_t ack = ntohl(tcp->ack_num);
-    uint16_t win = ntohs(tcp->window);
+    uint16_t src_port = ntohs_unaligned(&tcp->src_port);
+    uint16_t dst_port = ntohs_unaligned(&tcp->dst_port);
+    uint32_t seq = ntohl_unaligned(&tcp->seq_num);
+    uint32_t ack = ntohl_unaligned(&tcp->ack_num);
+    uint16_t win = ntohs_unaligned(&tcp->window);
     uint8_t data_offset = (tcp->data_offset >> 4) * 4;
 
     for (int i = 0; i < leftpad; i++) {

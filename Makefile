@@ -56,6 +56,7 @@ $(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),test)))
 $(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),test-kernel)))
 $(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),test-image)))
 $(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),run-img)))
+$(foreach arch,$(SUPPORTED_ARCHS),$(eval $(call ARCH_TEMPLATE,$(arch),unit-tests)))
 
 # Multi-architecture dispatch
 define MULTI_ARCH_TARGET
@@ -63,10 +64,15 @@ define MULTI_ARCH_TARGET
 $(1):
 ifeq ($$(ARCH),)
 	@echo "$$(BLUE)$(2) all architectures...$$(NC)"
-	@$$(MAKE) --no-print-directory _$(1)_riscv
-	@$$(MAKE) --no-print-directory _$(1)_arm64
-	@$$(MAKE) --no-print-directory _$(1)_amd64
-	@echo "$$(GREEN)$(3)$$(NC)"
+	@failed=0; \
+	$$(MAKE) --no-print-directory _$(1)_riscv || failed=$$$$((failed + 1)); \
+	$$(MAKE) --no-print-directory _$(1)_arm64 || failed=$$$$((failed + 1)); \
+	$$(MAKE) --no-print-directory _$(1)_amd64 || failed=$$$$((failed + 1)); \
+	if [ $$$$failed -gt 0 ]; then \
+		echo "$$(RED)$$$$failed architecture(s) failed during $(1)$$(NC)" >&2; \
+		exit 1; \
+	fi; \
+	echo "$$(GREEN)$(3)$$(NC)"
 else
 	@$$(MAKE) --no-print-directory _$(1)_$$(ARCH)
 endif
@@ -76,6 +82,7 @@ $(eval $(call MULTI_ARCH_TARGET,build,Building,All architectures built!))
 $(eval $(call MULTI_ARCH_TARGET,test,Testing,All tests passed!))
 $(eval $(call MULTI_ARCH_TARGET,test-kernel,Testing kernels for,All kernel tests passed!))
 $(eval $(call MULTI_ARCH_TARGET,test-image,Testing disk images for,All disk image tests passed!))
+$(eval $(call MULTI_ARCH_TARGET,unit-tests,Running unit tests for,All unit tests passed!))
 
 # Simple targets
 .PHONY: all clean help
@@ -104,6 +111,7 @@ help:
 	@echo "  test        - Test kernel(s) and disk images"
 	@echo "  test-kernel - Test kernel(s)"
 	@echo "  test-image  - Test disk images"
+	@echo "  unit-tests  - Run unit tests in QEMU"
 	@echo "  clean       - Remove build files"
 	@echo "  check-deps  - Check build dependencies"
 	@echo ""
@@ -210,11 +218,11 @@ LDFLAGS := -nostdlib -static -no-pie -T$(ARCH_DIR)/kernel.ld -Wl,-Map=$(MAP)
 DRIVER_DIR := drivers
 
 # Search paths for source files
-vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel/resources apps apps/illegal-instruction apps/random apps/netdev-mac apps/arp-broadcast apps/packet-print apps/network/ethernet apps/network/arp apps/network/ipv4 apps/network/tcp apps/network/udp $(DRIVER_DIR) \
+vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel/resources apps apps/illegal-instruction apps/random apps/netdev-mac apps/arp-broadcast apps/packet-print apps/network/ethernet apps/network/arp apps/network/ipv4 apps/network/tcp apps/network/udp apps/network/icmp $(DRIVER_DIR) \
           $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng $(DRIVER_DIR)/e1000 $(DRIVER_DIR)/rtl8139
 vpath %.S $(ARCH_DIR)
 
-C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(ARCH_DIR)/platform.c
+C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(COMMON_DIR)/byteorder.c $(ARCH_DIR)/platform.c
 C_SOURCES += apps/illegal-instruction/app_illegal_instruction.c
 C_SOURCES += apps/random/random.c
 C_SOURCES += apps/netdev-mac/mac_virtio_net.c
@@ -229,6 +237,7 @@ C_SOURCES += apps/network/arp/arp.c
 C_SOURCES += apps/network/ipv4/ipv4.c
 C_SOURCES += apps/network/tcp/tcp.c
 C_SOURCES += apps/network/udp/udp.c
+C_SOURCES += apps/network/icmp/icmp.c
 C_SOURCES += kernel/resources/resources.c
 C_SOURCES += $(DRIVER_DIR)/virtio_net/virtio_net.c
 C_SOURCES += $(DRIVER_DIR)/virtio_blk/virtio_blk.c
@@ -348,8 +357,9 @@ $(DISK_IMG): $(KERNEL_BIN)
 endif
 
 # Implementation targets
-.PHONY: _do_build _do_test _do_test-kernel _do_test-image _do_run _do_run-img _do_check_deps
+.PHONY: _do_build _do_test _do_test-kernel _do_test-image _do_run _do_run-img _do_check_deps _do_unit-tests
 _do_build: $(KERNEL_ELF) $(DISK_IMG)
+	@$(MAKE) --no-print-directory -C tests/test-kernel ARCH=$(ARCH) build
 
 _do_run: $(KERNEL_ELF)
 	@echo "$(BLUE)Starting YasouOS in QEMU ($(ARCH))...$(NC)"
@@ -367,6 +377,7 @@ endif
 
 _do_test: $(KERNEL_ELF) $(DISK_IMG)
 	@./tests/run-all.sh $(ARCH)
+	@$(MAKE) --no-print-directory -C tests/test-kernel ARCH=$(ARCH) test
 
 _do_test-kernel: $(KERNEL_ELF) $(DISK_IMG)
 	@./tests/run-all.sh $(ARCH) kernel
@@ -390,5 +401,8 @@ _do_check_deps:
 		echo "$(RED)✗ not found$(NC)"; \
 	fi
 	@echo ""
+
+_do_unit-tests:
+	@$(MAKE) --no-print-directory -C tests/test-kernel ARCH=$(ARCH) test
 
 endif

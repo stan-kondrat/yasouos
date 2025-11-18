@@ -192,11 +192,6 @@ int rtl8139_receive(rtl8139_t *ctx, uint8_t *buffer, size_t buffer_size, size_t 
         return -1;
     }
 
-    uint16_t isr = rtl8139_read16(ctx, RTL8139_ISR);
-    if (isr != 0) {
-        rtl8139_write16(ctx, RTL8139_ISR, isr);
-    }
-
     if ((rtl8139_read8(ctx, RTL8139_CMD) & RTL8139_CMD_BUFE) != 0) {
         return -1;
     }
@@ -210,6 +205,11 @@ int rtl8139_receive(rtl8139_t *ctx, uint8_t *buffer, size_t buffer_size, size_t 
 
     if ((packet_status & 0x01) == 0 || packet_length < 4) {
         return -1;
+    }
+
+    uint16_t isr = rtl8139_read16(ctx, RTL8139_ISR);
+    if (isr != 0) {
+        rtl8139_write16(ctx, RTL8139_ISR, isr);
     }
 
     packet_length -= 4;
