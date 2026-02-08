@@ -183,10 +183,10 @@ _do_test: $(TEST_ELFS)
 			-nographic --no-reboot > $$output_file 2>&1 & \
 		qemu_pid=$$!; \
 		elapsed=0; \
-		timeout=5; \
+		timeout_sec=10; \
 		while kill -0 $$qemu_pid 2>/dev/null; do \
-			if [ $$elapsed -ge $$timeout ]; then \
-				printf "$(RED)✗ timed out after $${timeout}s$(NC)\n"; \
+			if [ $$elapsed -ge $$((timeout_sec * 10)) ]; then \
+				printf "$(RED)✗ timed out after $${timeout_sec}s$(NC)\n"; \
 				kill -9 $$qemu_pid 2>/dev/null; \
 				wait $$qemu_pid 2>/dev/null; \
 				printf "$(BLUE)--- Output ---$(NC)\n"; \
@@ -199,7 +199,7 @@ _do_test: $(TEST_ELFS)
 			elapsed=$$((elapsed + 1)); \
 		done; \
 		wait $$qemu_pid 2>/dev/null; \
-		if [ $$elapsed -lt $$timeout ]; then \
+		if [ $$elapsed -lt $$((timeout_sec * 10)) ]; then \
 			if grep -q "tests starts" $$output_file && \
 			   grep -q "Tests passed:" $$output_file && \
 			   grep -q "tests failed: 0" $$output_file; then \

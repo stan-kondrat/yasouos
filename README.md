@@ -45,10 +45,7 @@ brew install x86_64-elf-gcc         # AMD64
 # QEMU for testing
 brew install qemu                   # All architectures
 
-# Ubuntu equivalents:
-# apt install gcc-riscv64-unknown-elf
-# apt install gcc-aarch64-linux-gnu
-# apt install gcc-multilib  # for x86_64
+# Linux: see docs/linux-development.md
 ```
 
 ## Build System

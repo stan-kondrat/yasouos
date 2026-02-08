@@ -371,12 +371,12 @@ int virtio_rng_read(virtio_rng_t *ctx, uint8_t *buffer, size_t size) {
 
     // Poll for completion (simple busy wait)
     uint16_t last_used = ctx->queue.last_used_idx;
-    int timeout = 100000;
-    while (ctx->queue.used.idx == last_used && timeout > 0) {
-        timeout--;
+    int timeout_count = 100000;
+    while (ctx->queue.used.idx == last_used && timeout_count > 0) {
+        timeout_count--;
     }
 
-    if (timeout == 0) {
+    if (timeout_count == 0) {
         // Release the descriptor on timeout
         ctx->desc_in_use[desc_idx] = false;
         return -1;

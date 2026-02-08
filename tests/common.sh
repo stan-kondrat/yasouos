@@ -184,7 +184,7 @@ TEST_MATRIX_NET_DEVICE=""
 TEST_MATRIX_VERBOSE=0
 TEST_MATRIX_TEST_COUNT=0
 TEST_MATRIX_FAILED_COUNT=0
-TEST_MATRIX_TIMEOUT=5
+TEST_MATRIX_TIMEOUT_SEC=5
 COLOR_CYAN='\033[0;36m'
 
 # Initialize test matrix framework
@@ -294,11 +294,11 @@ get_full_qemu_cmd() {
 }
 
 # Run single test case and return output
-# Usage: output=$(run_test_case "<qemu_command>" [timeout])
+# Usage: output=$(run_test_case "<qemu_command>" [timeout_sec])
 # The function prints test metadata to stderr and returns test output to stdout
 run_test_case() {
     local full_qemu_command="$1"
-    local timeout="${2:-$TEST_MATRIX_TIMEOUT}"
+    local timeout_sec="${2:-$TEST_MATRIX_TIMEOUT_SEC}"
 
     test_timer_start
 
@@ -310,7 +310,7 @@ run_test_case() {
 
     # Wait for QEMU with timeout (in 100ms intervals)
     local count=0
-    local max_count=$((timeout * 10))
+    local max_count=$((timeout_sec * 10))
     while kill -0 "$qemu_pid" 2>/dev/null && [ $count -lt $max_count ]; do
         sleep 0.1
         count=$((count + 1))

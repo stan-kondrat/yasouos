@@ -591,8 +591,8 @@ int virtio_net_transmit(virtio_net_t *ctx, const uint8_t *packet, size_t length)
 
     // Poll for completion
     uint16_t last_used = ctx->tx_last_used_idx;
-    int timeout = 100000;
-    while (timeout > 0) {
+    int timeout_count = 100000;
+    while (timeout_count > 0) {
         __sync_synchronize();
         uint16_t current_used;
         if (ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
@@ -603,10 +603,10 @@ int virtio_net_transmit(virtio_net_t *ctx, const uint8_t *packet, size_t length)
         if (current_used != last_used) {
             break;
         }
-        timeout--;
+        timeout_count--;
     }
 
-    if (timeout == 0) {
+    if (timeout_count == 0) {
         ctx->tx_desc_in_use[desc_idx] = false;
         return -1;
     }

@@ -34,10 +34,10 @@ jobs:
     - name: Build and Install QEMU 10
       if: steps.cache-qemu.outputs.cache-hit != 'true'
       run: |
-        # Build QEMU 10.1.0 from source with all architectures
-        wget -q https://download.qemu.org/qemu-10.1.0.tar.xz
-        tar xf qemu-10.1.0.tar.xz
-        cd qemu-10.1.0
+        # Build QEMU 10.2.0 from source with all architectures
+        wget -q https://download.qemu.org/qemu-10.2.0.tar.xz
+        tar xf qemu-10.2.0.tar.xz
+        cd qemu-10.2.0
 
         # Build for all target architectures we need
         ./configure --prefix=/opt/qemu-10 \
@@ -51,7 +51,7 @@ jobs:
         make -j$(nproc)
         sudo make install
         cd ..
-        rm -rf qemu-10.1.0 qemu-10.1.0.tar.xz
+        rm -rf qemu-10.2.0 qemu-10.2.0.tar.xz
 
     - name: Create QEMU archive
       if: steps.cache-qemu.outputs.cache-hit != 'true'
