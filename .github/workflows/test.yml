@@ -19,7 +19,7 @@ jobs:
       id: cache-qemu
       with:
         path: /opt/qemu-10
-        key: ${{ runner.os }}-qemu10-v3
+        key: ${{ runner.os }}-qemu10-v4
         restore-keys: |
           ${{ runner.os }}-qemu10-
 
@@ -29,6 +29,7 @@ jobs:
         sudo apt-get update -qq
         sudo apt-get install -y -qq build-essential ninja-build pkg-config \
           libglib2.0-dev libpixman-1-dev python3-venv python3-pip \
+          libslirp-dev \
           git wget curl meson
 
     - name: Build and Install QEMU 10
@@ -43,6 +44,7 @@ jobs:
         ./configure --prefix=/opt/qemu-10 \
           --target-list=riscv64-softmmu,aarch64-softmmu,x86_64-softmmu \
           --enable-virtfs \
+          --enable-slirp \
           --disable-docs \
           --disable-gtk \
           --disable-sdl \
@@ -192,11 +194,16 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Install test dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq tcpdump netcat-openbsd
+
     - name: Restore QEMU from cache
       uses: actions/cache@v4
       with:
         path: /opt/qemu-10
-        key: ${{ runner.os }}-qemu10-v3
+        key: ${{ runner.os }}-qemu10-v4
         restore-keys: |
           ${{ runner.os }}-qemu10-
 
