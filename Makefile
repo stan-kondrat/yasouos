@@ -112,6 +112,7 @@ help:
 	@echo "  test-kernel - Test kernel(s)"
 	@echo "  test-image  - Test disk images"
 	@echo "  unit-tests  - Run unit tests in QEMU"
+	@echo "  build-iso   - Build bootable ISO with Limine (AMD64 only)"
 	@echo "  clean       - Remove build files"
 	@echo "  check-deps  - Check build dependencies"
 	@echo ""
@@ -131,6 +132,27 @@ endef
 
 $(eval $(call SINGLE_ARCH_TARGET,run))
 $(eval $(call SINGLE_ARCH_TARGET,run-img))
+
+# Build bootable ISO with Limine (AMD64 only)
+ISO_DIR := build-iso
+ISO_VERSION = $(shell git describe --tags 2>/dev/null || git rev-parse --short HEAD)
+ISO_NAME = $(ISO_DIR)/yasouos-amd64-$(ISO_VERSION).iso
+LIMINE_DATADIR = $(shell limine --print-datadir 2>/dev/null || echo /usr/share/limine)
+
+.PHONY: build-iso
+build-iso: build/amd64/kernel.elf
+	@mkdir -p $(ISO_DIR)
+	@cp build/amd64/kernel.elf $(ISO_DIR)/
+	@cp $(LIMINE_DATADIR)/limine-bios.sys $(ISO_DIR)/
+	@cp $(LIMINE_DATADIR)/limine-bios-cd.bin $(ISO_DIR)/
+	@test -f $(ISO_DIR)/limine.conf || printf 'serial: yes\n\ntimeout: 0\n\n/YasouOS\n    protocol: multiboot1\n    path: boot():/kernel.elf\n    cmdline: app=http-hello log=warn\n' > $(ISO_DIR)/limine.conf
+	@rm -f $(ISO_DIR)/yasouos-*.iso
+	xorriso -as mkisofs -R -r -J \
+		-b limine-bios-cd.bin \
+		-no-emul-boot -boot-load-size 4 -boot-info-table \
+		$(ISO_DIR)/ -o $(ISO_NAME)
+	limine bios-install $(ISO_NAME)
+	@echo "$(GREEN)ISO built: $(ISO_NAME) ($$(du -h $(ISO_NAME) | cut -f1))$(NC)"
 
 # Dependency checking
 .PHONY: check-deps

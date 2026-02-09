@@ -1,5 +1,5 @@
 # Simple multiboot header for direct boot
-.section .multiboot
+.section .multiboot, "a"
 .align 4
 .long 0x1BADB002    # magic
 .long 0x00000003    # flags
