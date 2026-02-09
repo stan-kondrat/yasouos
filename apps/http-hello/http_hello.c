@@ -71,7 +71,7 @@ static size_t build_http_response(uint8_t *buf, uint32_t client_ip_host) {
         while (*_s) dst[len++] = *_s++; \
     } while(0)
 
-    APPEND("HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ");
+    APPEND("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nContent-Type: text/plain\r\nContent-Length: ");
     len += write_decimal_size(buf + len, body_len);
     APPEND("\r\n\r\n");
     for (size_t i = 0; i < body_len; i++) dst[len++] = body[i];
@@ -158,7 +158,10 @@ void app_http_hello(void) {
     uint8_t *buffer = buffer_storage + ETH_ALIGNMENT_OFFSET;
     uint8_t *reply_buffer = reply_buffer_storage + ETH_ALIGNMENT_OFFSET;
 
-    uint32_t seq_counter = 1000;
+    // Stateless TCP: use a monotonic counter for SYN-ACK ISN, then derive
+    // our seq from the client's ack_num in subsequent packets (the client
+    // echoes back what it expects from us — no per-connection state needed).
+    static uint32_t isn_counter = 1000;
 
     while (1) {
         size_t received_length = 0;
@@ -211,7 +214,8 @@ void app_http_hello(void) {
         }
 
         uint16_t src_port = ntohs_unaligned(&tcp->src_port);
-        uint32_t seq = ntohl_unaligned(&tcp->seq_num);
+        uint32_t their_seq = ntohl_unaligned(&tcp->seq_num);
+        uint32_t their_ack = ntohl_unaligned(&tcp->ack_num);
         uint8_t flags = tcp->flags;
         uint8_t data_offset = (tcp->data_offset >> 4) * 4;
         uint16_t ip_total_len = ntohs_unaligned(&ip->total_length);
@@ -221,38 +225,39 @@ void app_http_hello(void) {
             ethernet_print(buffer, received_length, devices[0].resource, 0);
         }
 
-        // SYN → reply SYN+ACK
+        // SYN → reply SYN+ACK with fresh ISN
         if (flags & TCP_FLAG_SYN) {
             log_debug(http_log, "SYN received\n");
+
+            uint32_t our_isn = isn_counter++;
 
             send_tcp_packet(&devices[0], reply_buffer, mac, eth->src,
                            ip->dst_ip, ip->src_ip,
                            dst_port, src_port,
-                           seq_counter, seq + 1,
+                           our_isn, their_seq + 1,
                            TCP_FLAG_SYN | TCP_FLAG_ACK, 65535,
                            NULL, 0);
-            seq_counter++;
 
             log_debug(http_log, "Sent SYN+ACK\n");
         }
 
-        // Data arrived → reply with HTTP response + FIN
+        // Data arrived → reply with HTTP response (keep-alive, no FIN)
+        // Use their_ack as our seq (client tells us what it expects)
         if (tcp_payload_len > 0) {
-            log_info(http_log, "HTTP request received, sending response\n");
+            log_debug(http_log, "HTTP request received, sending response\n");
 
             uint32_t client_ip = ntohl_unaligned(&ip->src_ip);
-            uint8_t http_buf[128];
+            uint8_t http_buf[192];
             size_t http_len = build_http_response(http_buf, client_ip);
 
             send_tcp_packet(&devices[0], reply_buffer, mac, eth->src,
                            ip->dst_ip, ip->src_ip,
                            dst_port, src_port,
-                           seq_counter, seq + tcp_payload_len,
-                           TCP_FLAG_PSH | TCP_FLAG_FIN | TCP_FLAG_ACK, 65535,
+                           their_ack, their_seq + tcp_payload_len,
+                           TCP_FLAG_PSH | TCP_FLAG_ACK, 65535,
                            http_buf, http_len);
-            seq_counter += http_len + 1;
 
-            log_info(http_log, "HTTP response sent\n");
+            log_debug(http_log, "HTTP response sent\n");
         }
 
         // FIN → ACK it
@@ -260,7 +265,7 @@ void app_http_hello(void) {
             send_tcp_packet(&devices[0], reply_buffer, mac, eth->src,
                            ip->dst_ip, ip->src_ip,
                            dst_port, src_port,
-                           seq_counter, seq + 1,
+                           their_ack, their_seq + 1,
                            TCP_FLAG_ACK, 65535,
                            NULL, 0);
         }

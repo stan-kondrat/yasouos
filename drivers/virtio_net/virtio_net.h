@@ -5,7 +5,7 @@
 #include "../../kernel/devices/devices.h"
 
 // VirtIO-Net queue size (actual descriptors we use)
-#define VIRTIO_NET_QUEUE_SIZE 4
+#define VIRTIO_NET_QUEUE_SIZE 16
 // Maximum queue size for PCI legacy (device advertises 256)
 #define VIRTIO_NET_MAX_QUEUE_SIZE 256
 #define VIRTIO_NET_MAX_PACKET_SIZE 2048

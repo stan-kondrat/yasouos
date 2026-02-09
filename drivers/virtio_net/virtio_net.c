@@ -318,7 +318,7 @@ static int virtio_net_init_context(void *ctx, device_t *device) {
 
         // Access avail ring through helper
         if (net_ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
-            uint16_t avail_idx = net_ctx->pci_rx_queue.avail.idx % VIRTIO_NET_QUEUE_SIZE;
+            uint16_t avail_idx = net_ctx->pci_rx_queue.avail.idx % VIRTIO_NET_MAX_QUEUE_SIZE;
             net_ctx->pci_rx_queue.avail.ring[avail_idx] = i;
             net_ctx->pci_rx_queue.avail.idx++;
         } else {
@@ -472,12 +472,13 @@ int virtio_net_receive(virtio_net_t *ctx, uint8_t *buffer, size_t buffer_size, s
     }
 
     // Get the used descriptor
-    uint16_t used_idx = last_used % VIRTIO_NET_QUEUE_SIZE;
     uint32_t desc_id, packet_len;
     if (ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
+        uint16_t used_idx = last_used % VIRTIO_NET_MAX_QUEUE_SIZE;
         desc_id = ctx->pci_rx_queue.used.ring[used_idx].id;
         packet_len = ctx->pci_rx_queue.used.ring[used_idx].len;
     } else {
+        uint16_t used_idx = last_used % VIRTIO_NET_QUEUE_SIZE;
         desc_id = ctx->mmio_rx_queue.used.ring[used_idx].id;
         packet_len = ctx->mmio_rx_queue.used.ring[used_idx].len;
     }
@@ -517,7 +518,7 @@ int virtio_net_receive(virtio_net_t *ctx, uint8_t *buffer, size_t buffer_size, s
 
     // Re-add descriptor to available ring for next packet
     if (ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
-        uint16_t avail_idx = ctx->pci_rx_queue.avail.idx % VIRTIO_NET_QUEUE_SIZE;
+        uint16_t avail_idx = ctx->pci_rx_queue.avail.idx % VIRTIO_NET_MAX_QUEUE_SIZE;
         ctx->pci_rx_queue.avail.ring[avail_idx] = desc_id;
         __sync_synchronize();
         ctx->pci_rx_queue.avail.idx++;
@@ -544,10 +545,39 @@ int virtio_net_receive(virtio_net_t *ctx, uint8_t *buffer, size_t buffer_size, s
     return 0;
 }
 
+// Reclaim completed TX descriptors from the used ring
+static void virtio_net_reclaim_tx(virtio_net_t *ctx) {
+    uint16_t used_idx;
+    if (ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
+        used_idx = ctx->pci_tx_queue.used.idx;
+    } else {
+        used_idx = ctx->mmio_tx_queue.used.idx;
+    }
+
+    while (ctx->tx_last_used_idx != used_idx) {
+        uint32_t desc_id;
+        if (ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
+            uint16_t ring_idx = ctx->tx_last_used_idx % VIRTIO_NET_MAX_QUEUE_SIZE;
+            desc_id = ctx->pci_tx_queue.used.ring[ring_idx].id;
+        } else {
+            uint16_t ring_idx = ctx->tx_last_used_idx % VIRTIO_NET_QUEUE_SIZE;
+            desc_id = ctx->mmio_tx_queue.used.ring[ring_idx].id;
+        }
+        if (desc_id < VIRTIO_NET_QUEUE_SIZE) {
+            ctx->tx_desc_in_use[desc_id] = false;
+        }
+        ctx->tx_last_used_idx++;
+    }
+}
+
 int virtio_net_transmit(virtio_net_t *ctx, const uint8_t *packet, size_t length) {
     if (!ctx || !packet || length == 0 || length > VIRTIO_NET_MAX_PACKET_SIZE || !ctx->initialized) {
         return -1;
     }
+
+    // Reclaim any completed TX descriptors before looking for a free one
+    __sync_synchronize();
+    virtio_net_reclaim_tx(ctx);
 
     // Find free TX descriptor
     uint16_t desc_idx = 0;
@@ -588,7 +618,7 @@ int virtio_net_transmit(virtio_net_t *ctx, const uint8_t *packet, size_t length)
 
     // Add to available ring
     if (ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
-        uint16_t avail_idx = ctx->pci_tx_queue.avail.idx % VIRTIO_NET_QUEUE_SIZE;
+        uint16_t avail_idx = ctx->pci_tx_queue.avail.idx % VIRTIO_NET_MAX_QUEUE_SIZE;
         ctx->pci_tx_queue.avail.ring[avail_idx] = desc_idx;
         __sync_synchronize();
         ctx->pci_tx_queue.avail.idx++;
@@ -612,31 +642,6 @@ int virtio_net_transmit(virtio_net_t *ctx, const uint8_t *packet, size_t length)
         virtio_write32(ctx, VIRTIO_MMIO_QUEUE_NOTIFY, 1);
     }
 
-    // Poll for completion
-    uint16_t last_used = ctx->tx_last_used_idx;
-    int timeout_count = 100000;
-    while (timeout_count > 0) {
-        __sync_synchronize();
-        uint16_t current_used;
-        if (ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
-            current_used = ctx->pci_tx_queue.used.idx;
-        } else {
-            current_used = ctx->mmio_tx_queue.used.idx;
-        }
-        if (current_used != last_used) {
-            break;
-        }
-        timeout_count--;
-    }
-
-    if (timeout_count == 0) {
-        ctx->tx_desc_in_use[desc_idx] = false;
-        return -1;
-    }
-
-    // Update last used index and free descriptor
-    ctx->tx_last_used_idx++;
-    ctx->tx_desc_in_use[desc_idx] = false;
-
+    // Fire-and-forget: descriptor will be reclaimed on next transmit call
     return 0;
 }
