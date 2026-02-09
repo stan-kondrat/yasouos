@@ -28,3 +28,31 @@ typedef struct {
  * @param leftpad Number of spaces to pad on the left (use 0 for no padding)
  */
 void tcp_print(const uint8_t *tcp_segment, size_t length, int leftpad);
+
+/**
+ * Calculate TCP checksum over pseudo-header + TCP segment
+ * @param src_ip Source IP address (network byte order)
+ * @param dst_ip Destination IP address (network byte order)
+ * @param tcp_segment Pointer to TCP header + payload (contiguous)
+ * @param tcp_length Total length of TCP header + payload in bytes
+ * @return Checksum in network byte order
+ */
+uint16_t tcp_checksum(uint32_t src_ip, uint32_t dst_ip, const uint8_t *tcp_segment, uint16_t tcp_length);
+
+/**
+ * Build TCP header and compute checksum
+ * Payload must already be in memory immediately after the header before calling.
+ * @param header Pointer to TCP header structure to fill
+ * @param src_port Source port (host byte order)
+ * @param dst_port Destination port (host byte order)
+ * @param seq Sequence number (host byte order)
+ * @param ack Acknowledgment number (host byte order)
+ * @param flags TCP flags (TCP_FLAG_SYN, TCP_FLAG_ACK, etc.)
+ * @param window Window size (host byte order)
+ * @param src_ip Source IP address (network byte order)
+ * @param dst_ip Destination IP address (network byte order)
+ * @param payload_length Length of payload after TCP header
+ */
+void tcp_build_header(tcp_hdr_t *header, uint16_t src_port, uint16_t dst_port,
+                      uint32_t seq, uint32_t ack, uint8_t flags, uint16_t window,
+                      uint32_t src_ip, uint32_t dst_ip, uint16_t payload_length);

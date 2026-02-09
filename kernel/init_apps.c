@@ -4,6 +4,7 @@
 #include "../apps/netdev-mac/netdev_mac.h"
 #include "../apps/arp-broadcast/arp_broadcast.h"
 #include "../apps/packet-print/packet_print.h"
+#include "../apps/http-hello/http_hello.h"
 #include "../drivers/virtio_net/virtio_net.h"
 #include "../drivers/e1000/e1000.h"
 #include "../drivers/rtl8139/rtl8139.h"
@@ -92,6 +93,11 @@ void init_apps(const char* cmdline) {
         // Check for app=packet-print
         if (param_has_value(app_param, "packet-print")) {
             app_packet_print();
+        }
+
+        // Check for app=http-hello
+        if (param_has_value(app_param, "http-hello")) {
+            app_http_hello();
         }
 
         // Find next app= parameter

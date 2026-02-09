@@ -24,6 +24,38 @@ Includes multiple variants:
 - `mac_e1000` - Tests Intel E1000 network devices
 - `mac_rtl8139` - Tests Realtek RTL8139 network devices
 
+## http-hello
+
+HTTP server that responds with "Hello, \<client-ip\>" to every request on port 80.
+
+Stateless TCP handler — no connection tracking. Each packet is handled independently:
+- SYN → SYN+ACK
+- Data (HTTP GET) → HTTP response + FIN
+- FIN → ACK
+
+Responds to any IP address (no hardcoded IP). ARP replies are sent for any target IP.
+
+### Running
+
+```bash
+# Build first
+make ARCH=arm64 build
+# ARM64 with virtio-net
+qemu-system-aarch64 -machine virt -cpu cortex-a53 \
+  -kernel build/arm64/kernel.bin \
+  -append "app=http-hello" \
+  -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 \
+  -netdev user,id=net0,hostfwd=tcp::8088-:80 \
+  -nographic --no-reboot
+```
+
+Then from another terminal:
+
+```bash
+curl http://127.0.0.1:8088/
+# Hello, 10.0.2.2
+```
+
 ## arp-broadcast
 
 Tests network packet transmission and reception using ARP protocol.

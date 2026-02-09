@@ -24,3 +24,9 @@ Print MAC addresses:
 - `app=mac-e1000` - E1000 devices only
 - `app=mac-rtl8139` - RTL8139 devices only
 - `app=mac-all` - All available network devices
+
+HTTP server:
+- `app=http-hello` - HTTP server on port 80, responds with "Hello, \<client-ip\>"
+
+Packet inspection:
+- `app=packet-print` - Print received network packets (Ethernet, ARP, IPv4, TCP, UDP, ICMP)
