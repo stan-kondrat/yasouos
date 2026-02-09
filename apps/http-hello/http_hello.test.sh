@@ -22,7 +22,7 @@ run_http_hello_test() {
 
     pcap_file=$(mktemp)
     qemu_args=(
-        -append "'app=http-hello'"
+        -append "'log=debug app=http-hello'"
         -device "$net_device,netdev=net0,mac=52:54:00:12:34:56"
         -netdev "user,id=net0,hostfwd=tcp::${http_port_host}-:80"
         -object "filter-dump,id=dump,netdev=net0,file=$pcap_file"

@@ -222,7 +222,7 @@ vpath %.c $(COMMON_DIR) $(ARCH_DIR) kernel kernel/devices kernel/platform kernel
           $(DRIVER_DIR)/virtio_net $(DRIVER_DIR)/virtio_blk $(DRIVER_DIR)/virtio_rng $(DRIVER_DIR)/e1000 $(DRIVER_DIR)/rtl8139
 vpath %.S $(ARCH_DIR)
 
-C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(COMMON_DIR)/byteorder.c $(ARCH_DIR)/platform.c
+C_SOURCES := kernel/kernel.c $(COMMON_DIR)/common.c $(COMMON_DIR)/byteorder.c $(COMMON_DIR)/log.c $(ARCH_DIR)/platform.c
 C_SOURCES += apps/illegal-instruction/app_illegal_instruction.c
 C_SOURCES += apps/random/random.c
 C_SOURCES += apps/netdev-mac/mac_virtio_net.c

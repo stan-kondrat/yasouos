@@ -1,5 +1,6 @@
 // init_apps.c - Application initialization based on kernel command line
 #include "../common/common.h"
+#include "../common/log.h"
 #include "../apps/random/random.h"
 #include "../apps/netdev-mac/netdev_mac.h"
 #include "../apps/arp-broadcast/arp_broadcast.h"
@@ -18,7 +19,11 @@ static const char* find_param(const char* cmdline, const char* param);
 static const char* find_next_param(const char* start, const char* param);
 static int param_has_value(const char* param_pos, const char* value);
 
+static log_tag_t *init_log;
+
 void init_apps(const char* cmdline) {
+    init_log = log_register("init", LOG_INFO);
+
     if (cmdline == NULL) {
         return;
     }
@@ -37,12 +42,15 @@ void init_apps(const char* cmdline) {
             uint8_t buffer[8];
             int result = random_get_bytes(buffer, sizeof(buffer));
             if (result > 0) {
-                puts("Random (software): ");
-                for (int i = 0; i < result; i++) {
-                    put_hex8(buffer[i]);
-                    puts(" ");
+                if (log_enabled(init_log, LOG_INFO)) {
+                    log_prefix(init_log, LOG_INFO);
+                    puts("Random (software): ");
+                    for (int i = 0; i < result; i++) {
+                        put_hex8(buffer[i]);
+                        puts(" ");
+                    }
+                    puts("\n");
                 }
-                puts("\n");
             }
         }
 
@@ -52,16 +60,19 @@ void init_apps(const char* cmdline) {
             uint8_t buffer[8];
             int result = random_get_bytes(buffer, sizeof(buffer));
             if (result > 0) {
-                if (hw_result == 0) {
-                    puts("Random (hardware): ");
-                } else {
-                    puts("Random (software): ");
+                if (log_enabled(init_log, LOG_INFO)) {
+                    log_prefix(init_log, LOG_INFO);
+                    if (hw_result == 0) {
+                        puts("Random (hardware): ");
+                    } else {
+                        puts("Random (software): ");
+                    }
+                    for (int i = 0; i < result; i++) {
+                        put_hex8(buffer[i]);
+                        puts(" ");
+                    }
+                    puts("\n");
                 }
-                for (int i = 0; i < result; i++) {
-                    put_hex8(buffer[i]);
-                    puts(" ");
-                }
-                puts("\n");
             }
         }
 

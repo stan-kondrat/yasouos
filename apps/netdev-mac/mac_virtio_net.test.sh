@@ -38,7 +38,7 @@ for arch in $TEST_MATRIX_ARCH; do
 
         # single device
         qemu_args=(
-            -append "'app=mac-virtio-net'"
+            -append "'log=debug app=mac-virtio-net'"
             -device "$device,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )
@@ -56,7 +56,7 @@ for arch in $TEST_MATRIX_ARCH; do
         fi
 
         qemu_args=(
-            -append "'app=mac-virtio-net app=mac-virtio-net'"
+            -append "'log=debug app=mac-virtio-net app=mac-virtio-net'"
             -device "$device,netdev=net0,mac=52:54:00:12:34:56"
             -device "$device,netdev=net1,mac=52:54:00:12:34:57"
             -netdev hubport,id=net0,hubid=0
@@ -77,7 +77,7 @@ for arch in $TEST_MATRIX_ARCH; do
         fi
 
         qemu_args=(
-            -append "'app=mac-virtio-net app=mac-virtio-net'"
+            -append "'log=debug app=mac-virtio-net app=mac-virtio-net'"
             -device "$device,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )

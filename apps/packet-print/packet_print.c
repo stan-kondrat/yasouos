@@ -9,34 +9,39 @@
 #include "../network/icmp/icmp.h"
 #include "../../common/common.h"
 #include "../../common/byteorder.h"
+#include "../../common/log.h"
+
+static log_tag_t *pktprint_log;
 
 void app_packet_print(void) {
-    puts("\n[packet-print] Starting packet-print application...\n");
+    pktprint_log = log_register("packet-print", LOG_INFO);
+    log_info(pktprint_log, "Starting packet-print application...\n");
     device_entry_t devices[1] = {0};
     int device_count = netdev_acquire_all(devices, 1);
 
     if (device_count < 1) {
-        puts("No network devices found\n");
+        log_error(pktprint_log, "No network devices found\n");
         return;
     }
 
-    resource_print_tag(devices[0].resource);
-    puts(" Initializing network device...\n");
+    log_debug(pktprint_log, "Initializing network device...\n");
 
     uint8_t mac[6];
     int result = netdev_get_mac(&devices[0], mac);
 
-    if (result == 0) {
-        resource_print_tag(devices[0].resource);
-        puts(" MAC: ");
+    if (result == 0 && log_enabled(pktprint_log, LOG_INFO)) {
+        log_prefix(pktprint_log, LOG_INFO);
+        puts("MAC: ");
         net_print_mac(mac);
         puts("\n");
     }
 
-    resource_print_tag(devices[0].resource);
-    puts(" Listening for UDP packets on port ");
-    net_print_decimal_u16(PACKET_PRINT_UDP_PORT);
-    puts("...\n");
+    if (log_enabled(pktprint_log, LOG_INFO)) {
+        log_prefix(pktprint_log, LOG_INFO);
+        puts("Listening for UDP packets on port ");
+        net_print_decimal_u16(PACKET_PRINT_UDP_PORT);
+        puts("...\n");
+    }
 
     // Ethernet frame alignment for efficient IPv4 header access
     // Ethernet header is 14 bytes. By offsetting buffer by 2 bytes,
@@ -54,7 +59,9 @@ void app_packet_print(void) {
         result = netdev_receive(&devices[0], buffer, PACKET_PRINT_BUFFER_SIZE, &received_length);
 
         if (result == 0 && received_length > 0) {
-            ethernet_print(buffer, received_length, devices[0].resource, 0);
+            if (log_enabled(pktprint_log, LOG_INFO)) {
+                ethernet_print(buffer, received_length, devices[0].resource, 0);
+            }
 
             if (received_length >= sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t)) {
                 const eth_hdr_t *eth = (const eth_hdr_t *)buffer;
@@ -75,17 +82,19 @@ void app_packet_print(void) {
                                 const uint8_t *payload = buffer + sizeof(eth_hdr_t) + sizeof(ipv4_hdr_t) + sizeof(udp_hdr_t);
                                 size_t payload_len = ntohs_unaligned(&udp->length) - sizeof(udp_hdr_t);
 
-                                resource_print_tag(devices[0].resource);
-                                puts(" Received UDP payload: ");
-                                for (size_t i = 0; i < payload_len && i < PACKET_PRINT_MAX_PAYLOAD_DISPLAY; i++) {
-                                    char c = payload[i];
-                                    if (c >= 32 && c <= 126) {
-                                        putchar(c);
-                                    } else {
-                                        putchar('.');
+                                if (log_enabled(pktprint_log, LOG_INFO)) {
+                                    log_prefix(pktprint_log, LOG_INFO);
+                                    puts("Received UDP payload: ");
+                                    for (size_t i = 0; i < payload_len && i < PACKET_PRINT_MAX_PAYLOAD_DISPLAY; i++) {
+                                        char c = payload[i];
+                                        if (c >= 32 && c <= 126) {
+                                            putchar(c);
+                                        } else {
+                                            putchar('.');
+                                        }
                                     }
+                                    puts("\n");
                                 }
-                                puts("\n");
 
                                 // Check if payload starts with "ping-"
                                 if (payload_len >= 6 &&
@@ -160,8 +169,7 @@ void app_packet_print(void) {
 
                                     result = netdev_transmit(&devices[0], reply_buffer, total_len);
                                     if (result == 0) {
-                                        resource_print_tag(devices[0].resource);
-                                        puts(" Sent UDP echo reply\n");
+                                        log_info(pktprint_log, "Sent UDP echo reply\n");
                                         handled_request = true;
                                     }
                                 }
@@ -176,8 +184,7 @@ void app_packet_print(void) {
                                 uint16_t dst_port = ntohs_unaligned(&tcp->dst_port);
 
                                 if (dst_port == PACKET_PRINT_IPV4_PORT) {
-                                    resource_print_tag(devices[0].resource);
-                                    puts(" TCP packet received\n");
+                                    log_info(pktprint_log, "TCP packet received\n");
                                     handled_request = true;
                                 }
                             }
@@ -214,8 +221,7 @@ void app_packet_print(void) {
 
                                         result = netdev_transmit(&devices[0], reply_buffer, total_len);
                                         if (result == 0) {
-                                            resource_print_tag(devices[0].resource);
-                                            puts(" Sent ICMP echo reply\n");
+                                            log_info(pktprint_log, "Sent ICMP echo reply\n");
                                             handled_request = true;
                                         }
                                     }
@@ -240,8 +246,7 @@ void app_packet_print(void) {
 
                         result = netdev_transmit(&devices[0], reply_buffer, ARP_PACKET_SIZE);
                         if (result == 0) {
-                            resource_print_tag(devices[0].resource);
-                            puts(" Sent ARP reply\n");
+                            log_debug(pktprint_log, "Sent ARP reply\n");
                         }
                     }
                 }

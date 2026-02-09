@@ -1,5 +1,8 @@
 #include "e1000.h"
 #include "../../common/common.h"
+#include "../../common/log.h"
+
+static log_tag_t *e1000_log;
 
 // ARM64 requires special handling for packed structures with -O3
 // GCC generates unaligned memory access instructions which can cause issues
@@ -64,6 +67,8 @@ static int e1000_init_context(void *ctx, device_t *device) {
         return -1;
     }
 
+    if (!e1000_log) e1000_log = log_register("e1000", LOG_INFO);
+
     e1000_t *e1000_ctx = (e1000_t *)ctx;
     e1000_ctx->mmio_base = device->reg_base;
     e1000_ctx->rx_current = 0;
@@ -127,6 +132,7 @@ static int e1000_init_context(void *ctx, device_t *device) {
     e1000_write32(e1000_ctx, E1000_RCTL, rctl);
 
     e1000_ctx->initialized = true;
+    log_info(e1000_log, "Driver initialized successfully\n");
     return 0;
 }
 

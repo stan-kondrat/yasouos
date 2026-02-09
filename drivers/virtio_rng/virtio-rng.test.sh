@@ -43,7 +43,7 @@ for arch in $TEST_MATRIX_ARCH; do
         fi
 
         qemu_args=(
-            -append "'app=random-hardware app=random-hardware'"
+            -append "'log=debug app=random-hardware app=random-hardware'"
         )
         output=$(run_test_case "$qemu_cmd ${qemu_args[*]} $device_args")
         assert_count "$output" "Random (hardware):" 2 "Hardware RNG working (found 'Random (hardware):' twice)"
@@ -75,7 +75,7 @@ for arch in $TEST_MATRIX_ARCH; do
         fi
 
         qemu_args=(
-            -append "'app=random-hardware app=random-hardware'"
+            -append "'log=debug app=random-hardware app=random-hardware'"
         )
         output=$(run_test_case "$qemu_cmd ${qemu_args[*]} $device_args")
         assert_count "$output" "Random (hardware):" 1 "Hardware RNG used once"

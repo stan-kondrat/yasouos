@@ -23,7 +23,7 @@ for arch in $TEST_MATRIX_ARCH; do
 
             qemu_cmd=$(get_full_qemu_cmd "riscv" "kernel")
             qemu_args=(
-                -append "'app=mac-all'"
+                -append "'log=debug app=mac-all'"
                 -device "virtio-net-device,netdev=net0,mac=52:54:00:11:11:11"
                 -device "virtio-net-device,netdev=net1,mac=52:54:00:22:22:22"
                 -device "e1000,netdev=net2,mac=52:54:00:33:33:33"
@@ -43,7 +43,7 @@ for arch in $TEST_MATRIX_ARCH; do
 
             qemu_cmd=$(get_full_qemu_cmd "amd64" "kernel")
             qemu_args=(
-                -append "'app=mac-all'"
+                -append "'log=debug app=mac-all'"
                 -device "virtio-net-pci,netdev=net0,mac=52:54:00:AA:BB:CC"
                 -device "rtl8139,netdev=net1,mac=52:54:00:DD:EE:FF"
                 -netdev hubport,id=net0,hubid=0
@@ -60,7 +60,7 @@ for arch in $TEST_MATRIX_ARCH; do
 
             qemu_cmd=$(get_full_qemu_cmd "arm64" "kernel")
             qemu_args=(
-                -append "'app=mac-all'"
+                -append "'log=debug app=mac-all'"
                 -device "virtio-net-device,netdev=net0,mac=52:54:00:01:02:03"
                 -device "virtio-net-device,netdev=net1,mac=52:54:00:04:05:06"
                 -device "virtio-net-device,netdev=net2,mac=52:54:00:07:08:09"

@@ -1,5 +1,8 @@
 #include "resources.h"
 #include "../../common/common.h"
+#include "../../common/log.h"
+
+static log_tag_t *res_log;
 
 #define MAX_RESOURCE_ALLOCATIONS 16
 
@@ -123,7 +126,8 @@ void resources_set_devices(device_t *devices) {
 
 void resources_update_devices(device_t *devices) {
     (void)devices;
-    puts("resources_update_devices: unimplemented\n");
+    if (!res_log) res_log = log_register("resources", LOG_INFO);
+    log_warn(res_log, "resources_update_devices: unimplemented\n");
 }
 
 resource_t* resource_acquire_available(const driver_t *driver, void *context) {

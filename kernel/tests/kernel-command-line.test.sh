@@ -36,7 +36,7 @@ for arch in $TEST_MATRIX_ARCH; do
         qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
 
         qemu_args=(
-            -append "'$CMDLINE_ARGS'"
+            -append "'log=debug $CMDLINE_ARGS'"
         )
         output=$(run_test_case "$qemu_cmd ${qemu_args[*]}")
         assert_count "$output" "lorem ipsum" 1 "Command line '$CMDLINE_ARGS' found in output"

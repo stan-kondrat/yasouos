@@ -31,7 +31,7 @@ for arch in $TEST_MATRIX_ARCH; do
         qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
 
         qemu_args=(
-            -append "'test=hello debug loglevel=7'"
+            -append "'log=debug test=hello'"
         )
         output=$(run_test_case "$qemu_cmd ${qemu_args[*]}")
 

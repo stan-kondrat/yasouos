@@ -25,7 +25,13 @@ for arch in $TEST_MATRIX_ARCH; do
 
         test_section "boot test ($arch $boot_type)"
 
-        output=$(run_test_case "$qemu_cmd")
+        qemu_args=()
+        # AMD64 raw image doesn't support -append (no -kernel)
+        if ! { [ "$arch" = "amd64" ] && [ "$boot_type" = "image" ]; }; then
+            qemu_args+=(-append "'log=debug'")
+        fi
+
+        output=$(run_test_case "$qemu_cmd ${qemu_args[*]}")
         assert_count "$output" "$BOOT_STRING" 1 "Boot string '$BOOT_STRING' found"
     done
 done

@@ -1,15 +1,14 @@
 /*
  * Test Platform Header
- * Platform-specific I/O functions for test kernels
+ * Platform-specific functions for test kernels.
+ * I/O functions (putchar, puts, put_hex*) are provided by common.h.
  */
 
 #ifndef TEST_PLATFORM_H
 #define TEST_PLATFORM_H
 
-// Platform-specific I/O functions (implemented in test_platform.*.c)
-void platform_init(void);
-void putchar(char ch);
-void puts(const char *str);
+#include "../../common/common.h"
+
 void platform_exit(int code);
 
 #endif

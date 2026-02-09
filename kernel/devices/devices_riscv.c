@@ -2,6 +2,9 @@
 #include "virtio_mmio.h"
 #include "../platform/fdt_parser.h"
 #include "../../common/common.h"
+#include "../../common/log.h"
+
+static log_tag_t *pci_log;
 
 // PCIe ECAM (Enhanced Configuration Access Mechanism) base address
 #define PCIE_ECAM_BASE          0x30000000ULL
@@ -384,11 +387,16 @@ static void probe_virtio_callback(const device_t *device, void *context) {
 int devices_enumerate(device_callback_t callback, [[maybe_unused]] void *context) {
     int total_devices = 0;
 
+    if (!pci_log) pci_log = log_register("pci", LOG_INFO);
+
     // Try PCIe ECAM first
     if (pci_detect_ecam()) {
-        puts("[PCI] Using PCIe ECAM at 0x");
-        put_hex64(PCIE_ECAM_BASE);
-        putchar('\n');
+        if (log_enabled(pci_log, LOG_DEBUG)) {
+            log_prefix(pci_log, LOG_DEBUG);
+            puts("Using PCIe ECAM at 0x");
+            put_hex64(PCIE_ECAM_BASE);
+            putchar('\n');
+        }
         total_devices += pcie_enumerate_devices(callback, context);
     }
 

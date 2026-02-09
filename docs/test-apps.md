@@ -43,7 +43,7 @@ make ARCH=arm64 build
 # ARM64 with virtio-net
 qemu-system-aarch64 -machine virt -cpu cortex-a53 \
   -kernel build/arm64/kernel.bin \
-  -append "app=http-hello" \
+  -append "app=http-hello log.http-hello=warn" \
   -device virtio-net-device,netdev=net0,mac=52:54:00:12:34:56 \
   -netdev user,id=net0,hostfwd=tcp::8088-:80 \
   -nographic --no-reboot

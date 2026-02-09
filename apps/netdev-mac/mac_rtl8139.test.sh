@@ -38,7 +38,7 @@ for arch in $TEST_MATRIX_ARCH; do
 
         # single device
         qemu_args=(
-            -append "'app=mac-rtl8139'"
+            -append "'log=debug app=mac-rtl8139'"
             -device "rtl8139,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )
@@ -62,7 +62,7 @@ for arch in $TEST_MATRIX_ARCH; do
         fi
 
         qemu_args=(
-            -append "'app=mac-rtl8139 app=mac-rtl8139'"
+            -append "'log=debug app=mac-rtl8139 app=mac-rtl8139'"
             -device "rtl8139,netdev=net0,mac=52:54:00:12:34:56"
             -device "rtl8139,netdev=net1,mac=52:54:00:12:34:57"
             -netdev hubport,id=net0,hubid=0
@@ -89,7 +89,7 @@ for arch in $TEST_MATRIX_ARCH; do
         fi
 
         qemu_args=(
-            -append "'app=mac-rtl8139 app=mac-rtl8139'"
+            -append "'log=debug app=mac-rtl8139 app=mac-rtl8139'"
             -device "rtl8139,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )

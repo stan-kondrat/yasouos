@@ -31,7 +31,7 @@ for arch in $TEST_MATRIX_ARCH; do
         qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
 
         qemu_args=(
-            -append "'app=illegal-instruction'"
+            -append "'log=debug app=illegal-instruction'"
         )
         output=$(run_test_case "$qemu_cmd ${qemu_args[*]}")
         assert_count "$output" "\\[EXCEPTION\\] Unknown/Illegal Instruction" 1 "Exception message found in output"

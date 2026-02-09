@@ -30,7 +30,7 @@ run_arp_broadcast_test() {
         echo "virtio-net-pci" || echo "virtio-net-device")
 
     qemu_args=(
-        -append "'app=arp-broadcast'"
+        -append "'log=debug app=arp-broadcast'"
         -device "$virtio_device,netdev=net0,mac=52:54:00:12:34:56"
         -device "rtl8139,netdev=net1,mac=52:54:00:12:34:57"
         -device "e1000,netdev=net2,mac=52:54:00:12:34:58"

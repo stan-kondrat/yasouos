@@ -1,5 +1,8 @@
 #include "rtl8139.h"
 #include "../../common/common.h"
+#include "../../common/log.h"
+
+static log_tag_t *rtl_log;
 
 #define PCI_VENDOR_ID_REALTEK 0x10EC
 #define RTL8139_DEVICE_ID 0x8139
@@ -107,6 +110,8 @@ static int rtl8139_init_context(void *ctx, device_t *device) {
         return -1;
     }
 
+    if (!rtl_log) rtl_log = log_register("rtl8139", LOG_INFO);
+
     rtl8139_t *rtl_ctx = (rtl8139_t *)ctx;
     rtl_ctx->mmio_base = device->reg_base;
     rtl_ctx->tx_current = 0;
@@ -151,6 +156,7 @@ static int rtl8139_init_context(void *ctx, device_t *device) {
     rtl8139_write16(rtl_ctx, RTL8139_IMR, RTL8139_INT_RXOK | RTL8139_INT_RXERR);
 
     rtl_ctx->initialized = true;
+    log_info(rtl_log, "Driver initialized successfully\n");
     return 0;
 }
 

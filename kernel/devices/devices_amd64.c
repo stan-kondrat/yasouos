@@ -1,5 +1,8 @@
 #include "devices.h"
 #include "../../common/common.h"
+#include "../../common/log.h"
+
+static log_tag_t *pci_log;
 
 // PCI configuration offsets
 #define PCI_VENDOR_ID_OFFSET    0x00
@@ -171,18 +174,24 @@ static uint64_t pci_probe_bar_size(uint8_t bus, uint8_t device, uint8_t function
 int devices_enumerate(device_callback_t callback, void *context) {
     int device_count = 0;
 
+    if (!pci_log) pci_log = log_register("pci", LOG_INFO);
+
     // Detect ECAM availability
     use_ecam = pci_detect_ecam();
-    if (use_ecam) {
-        puts("[PCI] Using PCIe ECAM at 0x");
-        put_hex64(PCIE_ECAM_BASE);
-        putchar('\n');
-    } else {
-        puts("[PCI] Using legacy I/O ports (0x");
-        put_hex16(PCI_CONFIG_ADDRESS_PORT);
-        puts("/0x");
-        put_hex16(PCI_CONFIG_DATA_PORT);
-        puts(")\n");
+    if (log_enabled(pci_log, LOG_DEBUG)) {
+        if (use_ecam) {
+            log_prefix(pci_log, LOG_DEBUG);
+            puts("Using PCIe ECAM at 0x");
+            put_hex64(PCIE_ECAM_BASE);
+            putchar('\n');
+        } else {
+            log_prefix(pci_log, LOG_DEBUG);
+            puts("Using legacy I/O ports (0x");
+            put_hex16(PCI_CONFIG_ADDRESS_PORT);
+            puts("/0x");
+            put_hex16(PCI_CONFIG_DATA_PORT);
+            puts(")\n");
+        }
     }
 
     // Scan first 2 PCI buses for virtual machine environments

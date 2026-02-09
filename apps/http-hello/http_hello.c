@@ -7,6 +7,9 @@
 #include "../network/tcp/tcp.h"
 #include "../../common/common.h"
 #include "../../common/byteorder.h"
+#include "../../common/log.h"
+
+static log_tag_t *http_log;
 
 // Write a decimal u8 to buffer, return number of bytes written
 static size_t write_decimal_u8(uint8_t *buf, uint8_t value) {
@@ -119,32 +122,34 @@ static void send_tcp_packet(const device_entry_t *dev, uint8_t *reply_buffer,
 }
 
 void app_http_hello(void) {
-    puts("\n[http-hello] Starting HTTP Hello World application...\n");
+    http_log = log_register("http-hello", LOG_INFO);
+    log_info(http_log, "Starting HTTP Hello World application...\n");
     device_entry_t devices[1] = {0};
     int device_count = netdev_acquire_all(devices, 1);
 
     if (device_count < 1) {
-        puts("No network devices found\n");
+        log_error(http_log, "No network devices found\n");
         return;
     }
 
-    resource_print_tag(devices[0].resource);
-    puts(" Initializing network device...\n");
+    log_debug(http_log, "Initializing network device...\n");
 
     uint8_t mac[6];
     int result = netdev_get_mac(&devices[0], mac);
 
-    if (result == 0) {
-        resource_print_tag(devices[0].resource);
-        puts(" MAC: ");
+    if (result == 0 && log_enabled(http_log, LOG_INFO)) {
+        log_prefix(http_log, LOG_INFO);
+        puts("MAC: ");
         net_print_mac(mac);
         puts("\n");
     }
 
-    resource_print_tag(devices[0].resource);
-    puts(" Listening on port ");
-    net_print_decimal_u16(HTTP_HELLO_PORT);
-    puts("...\n");
+    if (log_enabled(http_log, LOG_INFO)) {
+        log_prefix(http_log, LOG_INFO);
+        puts("Listening on port ");
+        net_print_decimal_u16(HTTP_HELLO_PORT);
+        puts("...\n");
+    }
 
     // Ethernet frame alignment
     #define ETH_ALIGNMENT_OFFSET 2
@@ -181,8 +186,7 @@ void app_http_hello(void) {
                 arp_build_reply(reply_buffer, mac, target_ip,
                                arp_req->sender_mac, sender_ip);
                 netdev_transmit(&devices[0], reply_buffer, ARP_PACKET_SIZE);
-                resource_print_tag(devices[0].resource);
-                puts(" Sent ARP reply\n");
+                log_debug(http_log, "Sent ARP reply\n");
             }
             continue;
         }
@@ -213,12 +217,13 @@ void app_http_hello(void) {
         uint16_t ip_total_len = ntohs_unaligned(&ip->total_length);
         uint16_t tcp_payload_len = ip_total_len - sizeof(ipv4_hdr_t) - data_offset;
 
-        ethernet_print(buffer, received_length, devices[0].resource, 0);
+        if (log_enabled(http_log, LOG_DEBUG)) {
+            ethernet_print(buffer, received_length, devices[0].resource, 0);
+        }
 
         // SYN → reply SYN+ACK
         if (flags & TCP_FLAG_SYN) {
-            resource_print_tag(devices[0].resource);
-            puts(" SYN received\n");
+            log_debug(http_log, "SYN received\n");
 
             send_tcp_packet(&devices[0], reply_buffer, mac, eth->src,
                            ip->dst_ip, ip->src_ip,
@@ -228,14 +233,12 @@ void app_http_hello(void) {
                            NULL, 0);
             seq_counter++;
 
-            resource_print_tag(devices[0].resource);
-            puts(" Sent SYN+ACK\n");
+            log_debug(http_log, "Sent SYN+ACK\n");
         }
 
         // Data arrived → reply with HTTP response + FIN
         if (tcp_payload_len > 0) {
-            resource_print_tag(devices[0].resource);
-            puts(" HTTP request received, sending response\n");
+            log_info(http_log, "HTTP request received, sending response\n");
 
             uint32_t client_ip = ntohl_unaligned(&ip->src_ip);
             uint8_t http_buf[128];
@@ -249,8 +252,7 @@ void app_http_hello(void) {
                            http_buf, http_len);
             seq_counter += http_len + 1;
 
-            resource_print_tag(devices[0].resource);
-            puts(" HTTP response sent\n");
+            log_info(http_log, "HTTP response sent\n");
         }
 
         // FIN → ACK it

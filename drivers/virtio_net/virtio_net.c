@@ -1,7 +1,10 @@
 #include "virtio_net.h"
 #include "../../kernel/devices/virtio_mmio.h"
 #include "../../common/common.h"
+#include "../../common/log.h"
 #include "../../apps/network/ethernet/ethernet.h"
+
+static log_tag_t *vnet_log;
 
 // Helper macros to access the correct queue based on transport
 #define GET_RX_DESC(ctx, idx) ((ctx)->transport == VIRTIO_NET_TRANSPORT_PCI ? \
@@ -125,21 +128,27 @@ static int virtio_net_init_virtqueue(virtio_net_t *ctx, uint16_t queue_index) {
         uint64_t queue_addr = (uint64_t)queue_ptr;
         uint32_t queue_pfn = queue_addr >> 12;
 
-        puts("[virtio-net] Queue addr: 0x");
-        put_hex64(queue_addr);
-        puts(" PFN: 0x");
-        put_hex32(queue_pfn);
-        puts("\n");
+        if (log_enabled(vnet_log, LOG_DEBUG)) {
+            log_prefix(vnet_log, LOG_DEBUG);
+            puts("Queue addr: 0x");
+            put_hex64(queue_addr);
+            puts(" PFN: 0x");
+            put_hex32(queue_pfn);
+            puts("\n");
+        }
 
         virtio_write32(ctx, VIRTIO_PCI_QUEUE_PFN, queue_pfn);
 
         uint32_t readback_pfn = virtio_read32(ctx, VIRTIO_PCI_QUEUE_PFN);
         if (readback_pfn != queue_pfn) {
-            puts("[virtio-net] ERROR: PFN mismatch! Expected: 0x");
-            put_hex32(queue_pfn);
-            puts(" Got: 0x");
-            put_hex32(readback_pfn);
-            puts("\n");
+            if (log_enabled(vnet_log, LOG_ERROR)) {
+                log_prefix(vnet_log, LOG_ERROR);
+                puts("PFN mismatch! Expected: 0x");
+                put_hex32(queue_pfn);
+                puts(" Got: 0x");
+                put_hex32(readback_pfn);
+                puts("\n");
+            }
             return -1;
         }
 
@@ -168,21 +177,27 @@ static int virtio_net_init_virtqueue(virtio_net_t *ctx, uint16_t queue_index) {
     uint64_t queue_addr = (uint64_t)queue_ptr;
     uint32_t queue_pfn = queue_addr >> 12;
 
-    puts("[virtio-net] Queue addr: 0x");
-    put_hex64(queue_addr);
-    puts(" PFN: 0x");
-    put_hex32(queue_pfn);
-    puts("\n");
+    if (log_enabled(vnet_log, LOG_DEBUG)) {
+        log_prefix(vnet_log, LOG_DEBUG);
+        puts("Queue addr: 0x");
+        put_hex64(queue_addr);
+        puts(" PFN: 0x");
+        put_hex32(queue_pfn);
+        puts("\n");
+    }
 
     virtio_write32(ctx, VIRTIO_MMIO_QUEUE_PFN, queue_pfn);
 
     uint32_t readback_pfn = virtio_read32(ctx, VIRTIO_MMIO_QUEUE_PFN);
     if (readback_pfn != queue_pfn) {
-        puts("[virtio-net] ERROR: PFN mismatch! Expected: 0x");
-        put_hex32(queue_pfn);
-        puts(" Got: 0x");
-        put_hex32(readback_pfn);
-        puts("\n");
+        if (log_enabled(vnet_log, LOG_ERROR)) {
+            log_prefix(vnet_log, LOG_ERROR);
+            puts("PFN mismatch! Expected: 0x");
+            put_hex32(queue_pfn);
+            puts(" Got: 0x");
+            put_hex32(readback_pfn);
+            puts("\n");
+        }
         return -1;
     }
 
@@ -193,6 +208,8 @@ static int virtio_net_init_context(void *ctx, device_t *device) {
     if (!ctx || !device) {
         return -1;
     }
+
+    if (!vnet_log) vnet_log = log_register("virtio-net", LOG_INFO);
 
     virtio_net_t *net_ctx = (virtio_net_t *)ctx;
     memset(net_ctx, 0, sizeof(virtio_net_t));
@@ -259,9 +276,9 @@ static int virtio_net_init_context(void *ctx, device_t *device) {
     }
 
     // Initialize RX queue (queue 0)
-    puts("[virtio-net] Initializing RX queue...\n");
+    log_debug(vnet_log, "Initializing RX queue...\n");
     if (virtio_net_init_virtqueue(net_ctx, 0) != 0) {
-        puts("[virtio-net] ERROR: RX queue init failed\n");
+        log_error(vnet_log, "RX queue init failed\n");
 #if defined(__x86_64__) || defined(__i386__)
         if (net_ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
             virtio_write8(net_ctx, VIRTIO_PCI_STATUS, VIRTIO_STATUS_FAILED);
@@ -272,12 +289,12 @@ static int virtio_net_init_context(void *ctx, device_t *device) {
         }
         return -1;
     }
-    puts("[virtio-net] RX queue initialized\n");
+    log_debug(vnet_log, "RX queue initialized\n");
 
     // Initialize TX queue (queue 1)
-    puts("[virtio-net] Initializing TX queue...\n");
+    log_debug(vnet_log, "Initializing TX queue...\n");
     if (virtio_net_init_virtqueue(net_ctx, 1) != 0) {
-        puts("[virtio-net] ERROR: TX queue init failed\n");
+        log_error(vnet_log, "TX queue init failed\n");
 #if defined(__x86_64__) || defined(__i386__)
         if (net_ctx->transport == VIRTIO_NET_TRANSPORT_PCI) {
             virtio_write8(net_ctx, VIRTIO_PCI_STATUS, VIRTIO_STATUS_FAILED);
@@ -288,7 +305,7 @@ static int virtio_net_init_context(void *ctx, device_t *device) {
         }
         return -1;
     }
-    puts("[virtio-net] TX queue initialized\n");
+    log_debug(vnet_log, "TX queue initialized\n");
 
     // Pre-populate RX queue with buffer descriptors
     // Apply alignment offset for ARM64 to ensure IP header 4-byte alignment
@@ -314,9 +331,12 @@ static int virtio_net_init_context(void *ctx, device_t *device) {
 
     uint16_t rx_avail_idx = (net_ctx->transport == VIRTIO_NET_TRANSPORT_PCI) ?
         net_ctx->pci_rx_queue.avail.idx : net_ctx->mmio_rx_queue.avail.idx;
-    puts("[virtio-net] RX buffers populated, avail.idx=");
-    put_hex16(rx_avail_idx);
-    puts("\n");
+    if (log_enabled(vnet_log, LOG_DEBUG)) {
+        log_prefix(vnet_log, LOG_DEBUG);
+        puts("RX buffers populated, avail.idx=");
+        put_hex16(rx_avail_idx);
+        puts("\n");
+    }
 
     __sync_synchronize();
 
@@ -369,7 +389,7 @@ static int virtio_net_init_context(void *ctx, device_t *device) {
 
     net_ctx->initialized = true;
 
-    puts("[virtio-net] Driver initialized successfully\n");
+    log_info(vnet_log, "Driver initialized successfully\n");
 
     return 0;
 }
@@ -436,11 +456,14 @@ int virtio_net_receive(virtio_net_t *ctx, uint8_t *buffer, size_t buffer_size, s
 
     static int debug_count = 0;
     if (debug_count < 5) {
-        puts("[virtio-net] RX check: last_used=");
-        put_hex16(last_used);
-        puts(" used_idx=");
-        put_hex16(used_ring_idx);
-        puts("\n");
+        if (log_enabled(vnet_log, LOG_DEBUG)) {
+            log_prefix(vnet_log, LOG_DEBUG);
+            puts("RX check: last_used=");
+            put_hex16(last_used);
+            puts(" used_idx=");
+            put_hex16(used_ring_idx);
+            puts("\n");
+        }
         debug_count++;
     }
 

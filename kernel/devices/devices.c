@@ -1,6 +1,9 @@
 #include "devices.h"
 #include "../../common/drivers.h"
 #include "../../common/common.h"
+#include "../../common/log.h"
+
+static log_tag_t *devices_log;
 
 // Device registry (linked list)
 static device_t *device_list_head = NULL;
@@ -92,11 +95,16 @@ static void build_tree_hierarchy(void) {
 }
 
 int devices_scan(void) {
-    puts("Scanning device tree...\n");
+    if (!devices_log) devices_log = log_register("devices", LOG_INFO);
+
+    log_info(devices_log, "Scanning device tree...\n");
     int device_count = devices_enumerate(add_device_to_registry, NULL);
-    puts("Found ");
-    put_hex16(device_count);
-    puts(" device(s)\n");
+    if (log_enabled(devices_log, LOG_INFO)) {
+        log_prefix(devices_log, LOG_INFO);
+        puts("Found ");
+        put_hex16(device_count);
+        puts(" device(s)\n");
+    }
 
     // Build tree hierarchy from flat list
     build_tree_hierarchy();
@@ -234,7 +242,10 @@ static void print_device(const device_t *device, int indent) {
 }
 
 void device_tree_print(void) {
-    puts("Device tree:\n");
+    if (!devices_log) devices_log = log_register("devices", LOG_INFO);
+    if (!log_enabled(devices_log, LOG_INFO)) return;
+
+    log_info(devices_log, "Device tree:\n");
 
     if (device_tree_root) {
         // Print tree hierarchy starting from all root-level devices

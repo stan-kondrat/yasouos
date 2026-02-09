@@ -27,7 +27,7 @@ run_packet_print_test() {
     # Use user-mode networking with TCP port forwarding
     pcap_file=$(mktemp)
     qemu_args=(
-        -append "'app=packet-print'"
+        -append "'log=debug app=packet-print'"
         -device "$net_device,netdev=net0,mac=52:54:00:12:34:56"
         -netdev "user,id=net0,hostfwd=tcp::${tcp_port_host}-:${tcp_port_guest}"
         -object "filter-dump,id=dump,netdev=net0,file=$pcap_file"

@@ -142,6 +142,7 @@ endef
 # Source files
 BOOT_SOURCE := $(PLATFORM_DIR)/boot_kernel.S
 PLATFORM_SOURCE := $(PLATFORM_DIR)/platform.c
+COMMON_RUNTIME := $(COMMON_DIR)/common.c
 COMMON_SOURCE := test_kernel_common.c
 KERNEL_STUBS := test_kernel_stubs.c
 
@@ -151,10 +152,10 @@ $(BUILD_DIR):
 
 # Rule to build a single test kernel
 define BUILD_TEST_TEMPLATE
-$(BUILD_DIR)/$(notdir $(basename $(1))).$(ARCH).elf: $(1) $(call get_test_deps,$(1)) $(BOOT_SOURCE) $(PLATFORM_SOURCE) $(COMMON_SOURCE) $(KERNEL_STUBS) $(LDSCRIPT) | $(BUILD_DIR)
+$(BUILD_DIR)/$(notdir $(basename $(1))).$(ARCH).elf: $(1) $(call get_test_deps,$(1)) $(BOOT_SOURCE) $(PLATFORM_SOURCE) $(COMMON_RUNTIME) $(COMMON_SOURCE) $(KERNEL_STUBS) $(LDSCRIPT) | $(BUILD_DIR)
 	@printf "$(BLUE)Building $(ARCH) test: $(notdir $(basename $(1)))$(NC)\n"
 	$(CC) $(CFLAGS) -T$(LDSCRIPT) \
-		$(BOOT_SOURCE) $(PLATFORM_SOURCE) $(COMMON_SOURCE) $(KERNEL_STUBS) $(1) $(call get_test_deps,$(1)) \
+		$(BOOT_SOURCE) $(PLATFORM_SOURCE) $(COMMON_RUNTIME) $(COMMON_SOURCE) $(KERNEL_STUBS) $(1) $(call get_test_deps,$(1)) \
 		-o $$@
 	@printf "$(GREEN)Built: $$@ ($$(du -h $$@ | cut -f1))$(NC)\n"
 endef
@@ -180,6 +181,7 @@ _do_test: $(TEST_ELFS)
 		output_file=$(BUILD_DIR)/$${test_name}.$(ARCH).log; \
 		$(QEMU) $(QEMU_FLAGS) \
 			-kernel $$elf \
+			-append 'log=debug' \
 			-nographic --no-reboot > $$output_file 2>&1 & \
 		qemu_pid=$$!; \
 		elapsed=0; \

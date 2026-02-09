@@ -30,7 +30,7 @@ run_packet_print_test() {
     # Use dgram networking for direct UDP packet injection
     pcap_file=$(mktemp)
     qemu_args=(
-        -append "'app=packet-print'"
+        -append "'log=debug app=packet-print'"
         -device "$net_device,netdev=net0,mac=52:54:00:12:34:56"
         -netdev "dgram,id=net0,local.type=inet,local.host=127.0.0.1,local.port=$udp_port_host,remote.type=inet,remote.host=127.0.0.1,remote.port=$udp_port_remote"
         -object "filter-dump,id=dump,netdev=net0,file=$pcap_file"
