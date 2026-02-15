@@ -63,6 +63,11 @@ make ARCH=riscv build   # RISC-V only
 make ARCH=arm64 build   # ARM64 only
 make ARCH=amd64 build   # AMD64 only
 
+# Build bootable ISO image (AMD64 only)
+make ARCH=amd64 build-iso                     # Build ISO with default (empty) command line
+make ARCH=amd64 build-iso CMDLINE="log=error"  # Build ISO with custom kernel command line
+make ARCH=amd64 run-iso                       # Build ISO and run it in QEMU
+
 # Testing
 make test               # Test all architectures (kernel + image + unit tests)
 make ARCH=riscv test    # Test RISC-V only

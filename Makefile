@@ -95,7 +95,7 @@ endif
 
 clean:
 	@echo "$(BLUE)Cleaning build files...$(NC)"
-	rm -rf build
+	rm -rf build build-test build-iso
 	@echo "$(GREEN)Clean complete$(NC)"
 
 help:
@@ -106,8 +106,10 @@ help:
 	@echo "Targets:"
 	@echo "  all         - Build and test all architectures (default)"
 	@echo "  build       - Build kernel(s) and disk images"
+	@echo "  build-iso   - Build bootable ISO with custom bootloader (AMD64 only)"
 	@echo "  run         - Build and run in QEMU (requires ARCH)"
 	@echo "  run-img     - Run bootable disk image interactively (requires ARCH)"
+	@echo "  run-iso     - Run bootable ISO image (requires ARCH=amd64)"
 	@echo "  test        - Test kernel(s) and disk images"
 	@echo "  test-kernel - Test kernel(s)"
 	@echo "  test-image  - Test disk images"
@@ -131,6 +133,7 @@ endef
 
 $(eval $(call SINGLE_ARCH_TARGET,run))
 $(eval $(call SINGLE_ARCH_TARGET,run-img))
+$(eval $(call SINGLE_ARCH_TARGET,run-iso))
 
 # Dependency checking
 .PHONY: check-deps
@@ -260,6 +263,7 @@ endif
 ASM_SOURCES := $(ARCH_DIR)/boot_kernel.S
 ifeq ($(ARCH),amd64)
 ASM_DISK_SOURCES := $(ARCH_DIR)/boot_disk.S
+ASM_ISO_SOURCES := $(ARCH_DIR)/boot_iso.S
 endif
 C_OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(notdir $(C_SOURCES)))
 ASM_OBJECTS := $(patsubst %.S,$(BUILD_DIR)/%.o,$(notdir $(ASM_SOURCES)))
@@ -299,6 +303,92 @@ $(KERNEL_DISK_BIN): $(KERNEL_DISK_ELF)
 	$(OBJCOPY) -O binary $< $@
 	@echo "$(GREEN)Disk kernel binary: $@ ($$(du -h $@ | cut -f1))$(NC)"
 endif
+
+# ============================================================================
+# ISO Boot Section (AMD64 only)
+# ============================================================================
+
+# ISO build configuration
+ISO_DIR := build-iso
+ISO_VERSION = $(shell git describe --tags 2>/dev/null || git rev-parse --short HEAD)
+ISO_NAME = $(ISO_DIR)/yasouos-amd64-$(ISO_VERSION).iso
+ISO_KERNEL_BIN = $(BUILD_DIR)/kernel_iso.bin
+
+# Kernel command line (can be overridden via: make ARCH=amd64 build-iso CMDLINE="log=error app=xxx")
+CMDLINE ?=
+
+# Build ISO kernel binary (disk boot version for ISO)
+ISO_C_OBJECTS := $(patsubst %.c,$(BUILD_DIR)/%_disk.o,$(notdir $(C_SOURCES)))
+ISO_ASM_OBJECTS := $(patsubst %.S,$(BUILD_DIR)/%_disk.o,$(notdir $(ASM_ISO_SOURCES))) $(BUILD_DIR)/cmdline_disk.o
+ISO_KERNEL_OBJECTS := $(ISO_ASM_OBJECTS) $(ISO_C_OBJECTS)
+ISO_KERNEL_ELF := $(BUILD_DIR)/kernel_iso.elf
+
+# Generate and compile cmdline.S at build time (grouped target, runs once)
+$(BUILD_DIR)/cmdline.S $(BUILD_DIR)/cmdline_disk.o: | $(BUILD_DIR)
+	@echo "$(BLUE)Generating kernel_cmdline with: $(CMDLINE)$(NC)"
+	@{ \
+		printf ".section .cmdline\n.global kernel_cmdline\nkernel_cmdline:\n"; \
+		printf '%s\n' "$(CMDLINE)" | od -An -tx1 -v | tr -s ' ' '\n' | grep -v '^$$' | \
+		while read byte; do \
+			printf ".byte 0x%s\n" "$$byte"; \
+		done; \
+		printf ".byte 0\n"; \
+	} > $(BUILD_DIR)/cmdline.S
+	@$(CC) $(CFLAGS) -DDISK_BOOT -c $(BUILD_DIR)/cmdline.S -o $(BUILD_DIR)/cmdline_disk.o
+
+$(ISO_KERNEL_ELF): $(ISO_KERNEL_OBJECTS) | $(BUILD_DIR)
+	@echo "$(BLUE)Linking kernel for ISO with CMDLINE='$(CMDLINE)'...$(NC)"
+	$(CC) $(CFLAGS) -DDISK_BOOT -nostdlib -static -no-pie \
+		-T$(ARCH_DIR)/kernel_iso.ld \
+		-Wl,-Map=$(BUILD_DIR)/ld_iso.map \
+		-o $@ $(ISO_KERNEL_OBJECTS)
+	@echo "$(GREEN)ISO kernel ELF built: $@ ($$(du -h $@ | cut -f1))$(NC)"
+
+$(ISO_KERNEL_BIN): $(ISO_KERNEL_ELF)
+	@echo "$(BLUE)Extracting ISO kernel binary...$(NC)"
+	$(OBJCOPY) -O binary $< $@
+	@SIZE=$$(stat -c%s $@ 2>/dev/null || stat -f%z $@); \
+	SIZE_KB=$$((SIZE / 1024)); \
+	echo "$(GREEN)ISO kernel binary: $@ ($$SIZE_KB KB)$(NC)"
+
+# Build bootable ISO
+.PHONY: build-iso
+build-iso: $(ISO_KERNEL_BIN)
+	@echo "$(BLUE)Building bootable ISO with CMDLINE='$(CMDLINE)'...$(NC)"
+	@rm -rf $(ISO_DIR)
+	@mkdir -p $(ISO_DIR)
+
+	@# Copy kernel binary and pad to 200KB (for BSS and stack)
+	@cp $(ISO_KERNEL_BIN) $(ISO_DIR)/boot.bin
+	@truncate -s 200K $(ISO_DIR)/boot.bin
+	@echo "$(BLUE)Padded boot.bin to 200KB$(NC)"
+
+	@# Build ISO with xorriso (200KB = 400 sectors of 512 bytes)
+	@echo "$(BLUE)Creating ISO (this may take a moment)...$(NC)"
+	xorriso -as mkisofs -R -r -J -b boot.bin -no-emul-boot \
+		-boot-load-size 400 $(ISO_DIR)/ -o $(ISO_NAME) || { \
+		echo "$(RED)xorriso failed!$(NC)"; exit 1; }
+
+	@# Verify ISO was created
+	@if [ -f "$(ISO_NAME)" ]; then \
+		ISO_SIZE=$$(du -h $(ISO_NAME) | cut -f1); \
+		echo "$(GREEN)ISO built successfully: $(ISO_NAME) ($$ISO_SIZE)$(NC)"; \
+		echo "$(BLUE)Test with: make ARCH=amd64 run-iso$(NC)"; \
+	else \
+		echo "$(RED)ERROR: ISO file not created!$(NC)"; \
+		exit 1; \
+	fi
+
+# Run ISO in QEMU
+.PHONY: _do_run-iso
+_do_run-iso: $(ISO_NAME)
+	@echo "$(BLUE)Running YasouOS from ISO in QEMU...$(NC)"
+	@echo "$(YELLOW)Press Ctrl-A X to exit$(NC)"
+	$(QEMU) -cdrom $(ISO_NAME) \
+		-m 128M \
+		-boot d \
+		-nographic \
+		--no-reboot || true
 
 # Pattern rules for compilation (vpath handles source lookup)
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
