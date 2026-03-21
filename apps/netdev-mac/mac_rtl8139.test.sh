@@ -2,14 +2,18 @@
 
 
 # Test RTL8139 MAC address reading
-# Usage: ./apps/netdev-mac/mac_rtl8139.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
+# Usage: ./apps/netdev-mac/mac_rtl8139.test.sh [-v] [--arch=riscv|arm64|amd64] [--boot=kernel|image|iso]
+#   -v: verbose mode (prints QEMU output)
+#   --arch=riscv|arm64|amd64: specify architecture (default: all, comma-separated supported)
+#   --boot=kernel|image|iso: specify boot type (default: all, comma-separated supported)
 #
 # Examples:
 #   ./apps/netdev-mac/mac_rtl8139.test.sh              # Run all architectures
 #   ./apps/netdev-mac/mac_rtl8139.test.sh -v           # Run all with verbose output
-#   ./apps/netdev-mac/mac_rtl8139.test.sh arm64        # Run ARM64 only
-#   ./apps/netdev-mac/mac_rtl8139.test.sh -v riscv     # Run RISC-V with verbose output
-#   ./apps/netdev-mac/mac_rtl8139.test.sh -v amd64 image
+#   ./apps/netdev-mac/mac_rtl8139.test.sh --arch=arm64        # Run ARM64 only
+#   ./apps/netdev-mac/mac_rtl8139.test.sh -v --arch=riscv     # Run RISC-V with verbose output
+#   ./apps/netdev-mac/mac_rtl8139.test.sh -v --arch=amd64 --boot=image
+#   ./apps/netdev-mac/mac_rtl8139.test.sh --arch=riscv,amd64  # Run RISC-V and AMD64
 
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,17 +32,10 @@ for arch in $TEST_MATRIX_ARCH; do
             continue
         fi
 
-        # AMD64 raw image doesn't support command line args (no bootloader yet)
-        if [ "$boot_type" = "image" ]; then
-            skip_test_case "AMD64 raw image doesn't support command line args"
-            continue
-        fi
-
-        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
+        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type" "log=debug app=mac-rtl8139")
 
         # single device
         qemu_args=(
-            -append "'log=debug app=mac-rtl8139'"
             -device "rtl8139,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )
@@ -55,14 +52,8 @@ for arch in $TEST_MATRIX_ARCH; do
             continue
         fi
 
-        # AMD64 raw image doesn't support command line args (no bootloader yet)
-        if [ "$boot_type" = "image" ]; then
-            skip_test_case "AMD64 raw image doesn't support command line args"
-            continue
-        fi
-
+        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type" "log=debug app=mac-rtl8139 app=mac-rtl8139")
         qemu_args=(
-            -append "'log=debug app=mac-rtl8139 app=mac-rtl8139'"
             -device "rtl8139,netdev=net0,mac=52:54:00:12:34:56"
             -device "rtl8139,netdev=net1,mac=52:54:00:12:34:57"
             -netdev hubport,id=net0,hubid=0
@@ -82,14 +73,7 @@ for arch in $TEST_MATRIX_ARCH; do
             continue
         fi
 
-        # AMD64 raw image doesn't support command line args (no bootloader yet)
-        if [ "$boot_type" = "image" ]; then
-            skip_test_case "AMD64 raw image doesn't support command line args"
-            continue
-        fi
-
         qemu_args=(
-            -append "'log=debug app=mac-rtl8139 app=mac-rtl8139'"
             -device "rtl8139,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )

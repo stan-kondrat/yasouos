@@ -1,13 +1,16 @@
 #!/bin/bash
 
 # Test mac-all application - prints all network devices MAC addresses
-# Usage: ./apps/netdev-mac/mac_all.test.sh [-v] [riscv|arm64|amd64]
+# Usage: ./apps/netdev-mac/mac_all.test.sh [-v] [--arch=riscv|arm64|amd64]
+#   -v: verbose mode (prints QEMU output)
+#   --arch=riscv|arm64|amd64: specify architecture (default: all, comma-separated supported)
 #
 # Examples:
 #   ./apps/netdev-mac/mac_all.test.sh              # Run all architectures
 #   ./apps/netdev-mac/mac_all.test.sh -v           # Run all with verbose output
-#   ./apps/netdev-mac/mac_all.test.sh riscv        # Run RISC-V only
-#   ./apps/netdev-mac/mac_all.test.sh -v amd64     # Run AMD64 with verbose output
+#   ./apps/netdev-mac/mac_all.test.sh --arch=riscv        # Run RISC-V only
+#   ./apps/netdev-mac/mac_all.test.sh -v --arch=amd64     # Run AMD64 with verbose output
+#   ./apps/netdev-mac/mac_all.test.sh --arch=riscv,amd64  # Run RISC-V and AMD64
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"

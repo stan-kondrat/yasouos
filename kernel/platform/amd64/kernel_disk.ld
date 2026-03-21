@@ -33,7 +33,13 @@ SECTIONS {
         *(.data .data.*)
     }
 
-    .bss : ALIGN(8) {
+    /* Place BSS above 4MB to avoid both the VGA/ROM region (0xA0000-0xFFFFF)
+     * and the cmdline at 0x200000 (injected by QEMU loader for disk boot).
+     * The disk boot kernel loads at 0x8000 and large driver RX/TX buffers
+     * in BSS can grow past 0xA0000 (VGA RAM) where writes are discarded.
+     * 0x400000 is safe: identity-mapped, above cmdline, well into extended memory. */
+    . = 0x400000;
+    .bss : {
         __bss = .;
         *(.bss .bss.* .sbss .sbss.*)
         *(COMMON)

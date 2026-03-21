@@ -467,14 +467,14 @@ else
 endif
 
 _do_test: $(KERNEL_ELF) $(DISK_IMG)
-	@./tests/run-all.sh $(ARCH)
+	@./tests/run-all.sh --arch=$(ARCH)
 	@$(MAKE) --no-print-directory -C tests/test-kernel ARCH=$(ARCH) test
 
 _do_test-kernel: $(KERNEL_ELF) $(DISK_IMG)
-	@./tests/run-all.sh $(ARCH) kernel
+	@./tests/run-all.sh --arch=$(ARCH) --boot=kernel
 
 _do_test-image: $(DISK_IMG)
-	@./tests/run-all.sh $(ARCH) image
+	@./tests/run-all.sh --arch=$(ARCH) --boot=image
 
 _do_check_deps:
 	@echo "$(BLUE)Checking $(ARCH) dependencies...$(NC)"

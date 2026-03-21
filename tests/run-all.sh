@@ -1,10 +1,11 @@
 #!/bin/bash
 
 # Run all YasouOS tests
-# Usage: ./tests/run-all.sh [-v] [arch] [boot_type]
+# Usage: ./tests/run-all.sh [-v] [--arch=riscv|arm64|amd64] [--boot=kernel|image|iso] [--netdev=e1000|rtl8139|virtio-net]
 #   -v: verbose mode
-#   arch: riscv|arm64|amd64 (if not specified, runs all)
-#   boot_type: kernel|image (if not specified, runs both)
+#   --arch=riscv|arm64|amd64: specify architecture (default: all, comma-separated supported)
+#   --boot=kernel|image|iso: specify boot type (default: all, comma-separated supported)
+#   --netdev=e1000|rtl8139|virtio-net: specify network device (default: all, comma-separated supported)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"

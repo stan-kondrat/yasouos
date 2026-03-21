@@ -1,13 +1,16 @@
 #!/bin/bash
 
 # Test arp-broadcast application - send ARP broadcast between two devices
-# Usage: ./apps/arp-broadcast/arp_broadcast.test.sh [-v] [riscv|amd64|arm64]
+# Usage: ./apps/arp-broadcast/arp_broadcast.test.sh [-v] [--arch=riscv|amd64|arm64]
+#   -v: verbose mode (prints QEMU output)
+#   --arch=riscv|arm64|amd64: specify architecture (default: all, comma-separated supported)
 #
 # Examples:
 #   ./apps/arp-broadcast/arp_broadcast.test.sh              # Run all architectures
 #   ./apps/arp-broadcast/arp_broadcast.test.sh -v           # Run with verbose output
-#   ./apps/arp-broadcast/arp_broadcast.test.sh riscv        # Run RISC-V only
-#   ./apps/arp-broadcast/arp_broadcast.test.sh amd64        # Run AMD64 only
+#   ./apps/arp-broadcast/arp_broadcast.test.sh --arch=riscv        # Run RISC-V only
+#   ./apps/arp-broadcast/arp_broadcast.test.sh --arch=amd64        # Run AMD64 only
+#   ./apps/arp-broadcast/arp_broadcast.test.sh --arch=riscv,amd64  # Run RISC-V and AMD64
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"

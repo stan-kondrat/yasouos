@@ -1,13 +1,17 @@
 #!/bin/bash
 
 # Test packet-print application - prints ICMP packets
-# Usage: ./apps/packet-print/packet_print_icmp.test.sh [-v] [riscv|amd64] [e1000|rtl8139|virtio-net]
+# Usage: ./apps/packet-print/packet_print_icmp.test.sh [-v] [--arch=riscv|amd64] [--netdev=e1000|rtl8139|virtio-net]
+#   -v: verbose mode (prints QEMU output)
+#   --arch=riscv|arm64|amd64: specify architecture (default: all, comma-separated supported)
+#   --netdev=e1000|rtl8139|virtio-net: specify network device (default: all, comma-separated supported)
 #
 # Examples:
 #   ./apps/packet-print/packet_print_icmp.test.sh              # Run all architectures
 #   ./apps/packet-print/packet_print_icmp.test.sh -v           # Run with verbose output
-#   ./apps/packet-print/packet_print_icmp.test.sh riscv        # Run RISC-V only
-#   ./apps/packet-print/packet_print_icmp.test.sh amd64        # Run AMD64 only
+#   ./apps/packet-print/packet_print_icmp.test.sh --arch=riscv        # Run RISC-V only
+#   ./apps/packet-print/packet_print_icmp.test.sh --arch=amd64        # Run AMD64 only
+#   ./apps/packet-print/packet_print_icmp.test.sh --arch=riscv,amd64 --netdev=e1000,virtio-net  # Run RISC-V and AMD64 with e1000 and virtio-net
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -151,7 +155,9 @@ for arch in $TEST_MATRIX_ARCH; do
         fi
 
         # Get network devices for this specific architecture
-        net_devices=$(get_net_devices_for_arch "$arch" "$TEST_MATRIX_NET_DEVICE")
+        if ! net_devices=$(get_net_devices_for_arch "$arch" "$TEST_MATRIX_NET_DEVICE"); then
+            exit 1
+        fi
 
         for device in $net_devices; do
             test_section "packet-print: ICMP traffic $arch ($boot_type) with $device"

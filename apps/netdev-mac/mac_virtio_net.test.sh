@@ -2,14 +2,18 @@
 
 
 # Test virtio-net MAC address reading
-# Usage: ./apps/netdev-mac/mac_virtio_net.test.sh [-v] [riscv|arm64|amd64] [kernel|image]
+# Usage: ./apps/netdev-mac/mac_virtio_net.test.sh [-v] [--arch=riscv|arm64|amd64] [--boot=kernel|image|iso]
+#   -v: verbose mode (prints QEMU output)
+#   --arch=riscv|arm64|amd64: specify architecture (default: all, comma-separated supported)
+#   --boot=kernel|image|iso: specify boot type (default: all, comma-separated supported)
 #
 # Examples:
 #   ./apps/netdev-mac/mac_virtio_net.test.sh              # Run all architectures
 #   ./apps/netdev-mac/mac_virtio_net.test.sh -v           # Run all with verbose output
-#   ./apps/netdev-mac/mac_virtio_net.test.sh arm64        # Run ARM64 only
-#   ./apps/netdev-mac/mac_virtio_net.test.sh -v riscv     # Run RISC-V with verbose output
-#   ./apps/netdev-mac/mac_virtio_net.test.sh -v amd64 image
+#   ./apps/netdev-mac/mac_virtio_net.test.sh --arch=arm64        # Run ARM64 only
+#   ./apps/netdev-mac/mac_virtio_net.test.sh -v --arch=riscv     # Run RISC-V with verbose output
+#   ./apps/netdev-mac/mac_virtio_net.test.sh -v --arch=amd64 --boot=image
+#   ./apps/netdev-mac/mac_virtio_net.test.sh --arch=riscv,amd64  # Run RISC-V and AMD64
 
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,23 +26,16 @@ for arch in $TEST_MATRIX_ARCH; do
     for boot_type in $TEST_MATRIX_BOOT_TYPE; do
         test_section "virtio-net single device ($arch $boot_type)"
 
-        # AMD64 raw image doesn't support command line args (no bootloader yet)
-        if [ "$arch" = "amd64" ] && [ "$boot_type" = "image" ]; then
-            skip_test_case "AMD64 raw image doesn't support command line args"
-            continue
-        fi
-
-        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type")
-
         if [ "$arch" = "amd64" ]; then
             device="virtio-net-pci"
         else
             device="virtio-net-device"
         fi
 
+        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type" "log=debug app=mac-virtio-net")
+
         # single device
         qemu_args=(
-            -append "'log=debug app=mac-virtio-net'"
             -device "$device,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )
@@ -49,14 +46,8 @@ for arch in $TEST_MATRIX_ARCH; do
         # two devices
         test_section "virtio-net two devices ($arch $boot_type)"
 
-        # AMD64 raw image doesn't support command line args (no bootloader yet)
-        if [ "$arch" = "amd64" ] && [ "$boot_type" = "image" ]; then
-            skip_test_case "AMD64 raw image doesn't support command line args"
-            continue
-        fi
-
+        qemu_cmd=$(get_full_qemu_cmd "$arch" "$boot_type" "log=debug app=mac-virtio-net app=mac-virtio-net")
         qemu_args=(
-            -append "'log=debug app=mac-virtio-net app=mac-virtio-net'"
             -device "$device,netdev=net0,mac=52:54:00:12:34:56"
             -device "$device,netdev=net1,mac=52:54:00:12:34:57"
             -netdev hubport,id=net0,hubid=0
@@ -70,14 +61,7 @@ for arch in $TEST_MATRIX_ARCH; do
         # one missing device
         test_section "virtio-net one missing device ($arch $boot_type)"
 
-        # AMD64 raw image doesn't support command line args (no bootloader yet)
-        if [ "$arch" = "amd64" ] && [ "$boot_type" = "image" ]; then
-            skip_test_case "AMD64 raw image doesn't support command line args"
-            continue
-        fi
-
         qemu_args=(
-            -append "'log=debug app=mac-virtio-net app=mac-virtio-net'"
             -device "$device,netdev=net0,mac=52:54:00:12:34:56"
             -netdev hubport,id=net0,hubid=0
         )

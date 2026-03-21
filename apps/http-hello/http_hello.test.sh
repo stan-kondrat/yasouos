@@ -1,12 +1,16 @@
 #!/bin/bash
 
 # Test HTTP Hello World application
-# Usage: ./apps/http-hello/http_hello.test.sh [-v] [riscv|amd64|arm64] [e1000|rtl8139|virtio-net]
+# Usage: ./apps/http-hello/http_hello.test.sh [-v] [--arch=riscv|amd64|arm64] [--netdev=e1000|rtl8139|virtio-net]
+#   -v: verbose mode (prints QEMU output)
+#   --arch=riscv|arm64|amd64: specify architecture (default: all, comma-separated supported)
+#   --netdev=e1000|rtl8139|virtio-net: specify network device (default: all, comma-separated supported)
 #
 # Examples:
 #   ./apps/http-hello/http_hello.test.sh              # Run all architectures
 #   ./apps/http-hello/http_hello.test.sh -v            # Run with verbose output
-#   ./apps/http-hello/http_hello.test.sh amd64 e1000   # Run AMD64 with e1000 only
+#   ./apps/http-hello/http_hello.test.sh --arch=amd64 --netdev=e1000   # Run AMD64 with e1000 only
+#   ./apps/http-hello/http_hello.test.sh --arch=amd64,riscv --netdev=e1000,virtio-net  # Run AMD64 and RISC-V with e1000 and virtio-net
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -149,7 +153,9 @@ for arch in $TEST_MATRIX_ARCH; do
             continue
         fi
 
-        net_devices=$(get_net_devices_for_arch "$arch" "$TEST_MATRIX_NET_DEVICE")
+        if ! net_devices=$(get_net_devices_for_arch "$arch" "$TEST_MATRIX_NET_DEVICE"); then
+            exit 1
+        fi
 
         for device in $net_devices; do
             test_section "http-hello: HTTP traffic $arch ($boot_type) with $device"

@@ -93,11 +93,23 @@ void platform_halt(void) {
 }
 
 const char* platform_get_cmdline(uintptr_t boot_param) {
+    // Check fixed address 0x200000 (disk boot with CMDLINE loader)
+    // This is used by QEMU's -device loader,file=cmdline.bin,addr=0x200000
+    // Located at 2MB — above BIOS/bootloader range and above kernel BSS/stack,
+    // so it survives the full boot sequence intact.
+    // Validate it's printable ASCII to avoid returning garbage from uninitialized memory
+    const char *cmdline_fixed = (const char *)0x200000;
+    uint8_t first_byte = *(volatile uint8_t *)0x200000;
+    if (first_byte >= 32 && first_byte <= 126) {
+        // First character is printable ASCII, likely a valid cmdline
+        return cmdline_fixed;
+    }
+
     if (boot_param == 0) {
         return NULL;
     }
 
-    // Try PVH protocol first
+    // Try PVH protocol next
     hvm_start_info_t *pvh = (hvm_start_info_t *)boot_param;
     if (pvh->magic == PVH_MAGIC) {
         if (pvh->cmdline_paddr == 0) {

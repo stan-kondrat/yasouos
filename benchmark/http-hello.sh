@@ -24,7 +24,9 @@ ARCH_FILTER=$(parse_arch "$1")
 NET_DEVICE_FILTER="$2"
 
 for arch in $ARCH_FILTER; do
-    net_devices=$(get_net_devices_for_arch "$arch" "$NET_DEVICE_FILTER")
+    if ! net_devices=$(get_net_devices_for_arch "$arch" "$NET_DEVICE_FILTER"); then
+        exit 1
+    fi
 
     for device in $net_devices; do
         # Skip rtl8139 — QEMU TCP bug
